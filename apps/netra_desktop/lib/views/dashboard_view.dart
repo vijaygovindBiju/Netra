@@ -44,6 +44,20 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     });
   }
 
+  bool _showAllApps = false;
+
+  void _toggleAllAppAccordions(List<NamedAppGroup> apps) {
+    setState(() {
+      final allExpanded = apps.isNotEmpty &&
+          apps.every((a) => _expandedAppNames.contains(a.appName.toLowerCase()));
+      if (allExpanded) {
+        _expandedAppNames.clear();
+      } else {
+        _expandedAppNames.addAll(apps.map((a) => a.appName.toLowerCase()));
+      }
+    });
+  }
+
   Widget _buildRestoreChip(String label, VoidCallback onRestore, NetraPalette colors) {
     return InkWell(
       onTap: onRestore,
@@ -120,9 +134,18 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final rxSpeed = _formatSpeed(metrics?.rxRateBps ?? 0);
     final txSpeed = _formatSpeed(metrics?.txRateBps ?? 0);
 
+    // Connected Wi-Fi network information
+    final connectedAp = netState.accessPoints.where((a) => a.isConnected).firstOrNull;
+    final connectedSsid = connectedAp?.ssid ?? (netState.accessPoints.any((a) => a.isConnected) ? netState.accessPoints.firstWhere((a) => a.isConnected).ssid : null);
+
+    // Total traffic on the active interface / Wi-Fi
+    final totalInterfaceBytes = (metrics?.rxBytes ?? 0) + (metrics?.txBytes ?? 0);
+    final totalAppTrafficBytes = trafficState.processes.fold<int>(0, (sum, p) => sum + p.totalRxBytes + p.totalTxBytes);
+    final referenceNetworkBytes = totalInterfaceBytes > 0 ? totalInterfaceBytes : (totalAppTrafficBytes > 0 ? totalAppTrafficBytes : 1);
+
     // Group processes by same application name
     final namedAppGroups = AppCategorizer.groupByAppName(trafficState.processes);
-    final topApps = namedAppGroups.take(5).toList();
+    final displayedApps = _showAllApps ? namedAppGroups : namedAppGroups.take(5).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -323,209 +346,372 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                     onCollapseChanged: (v) => setState(() => _collapseAppUsage = v),
                     onRemove: () => setState(() => _showAppUsage = false),
                     collapsedSummary: _buildSummaryPill(
-                      '${topApps.length} Apps Active',
+                      '${displayedApps.length} Apps Active',
                       colors.primary,
                     ),
                     headerActions: [
-                      TextButton.icon(
-                        onPressed: () => ref.read(activeTabProvider.notifier).state = 4,
-                        icon: const Icon(Icons.arrow_forward, size: 14),
-                        label: const Text('View All in Traffic'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: colors.primary,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
-              ],
-              child: topApps.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: Text(
-                          'Scanning network sockets across processes...',
-                          style: TextStyle(color: colors.textMuted, fontSize: 13),
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: topApps.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, idx) {
-                        final app = topApps[idx];
-                        final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
-                        final appTotalBytes = app.totalBytes;
-
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: colors.surface,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isExpanded
-                                  ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
-                                  : colors.border,
+                      if (namedAppGroups.length > 5)
+                        InkWell(
+                          onTap: () => setState(() => _showAllApps = !_showAllApps),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            child: Text(
+                              _showAllApps ? 'Top 5' : 'All (${namedAppGroups.length})',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: colors.primary,
+                              ),
                             ),
                           ),
-                          child: Column(
+                        ),
+                      Tooltip(
+                        message: displayedApps.isNotEmpty &&
+                                displayedApps.every((a) => _expandedAppNames.contains(a.appName.toLowerCase()))
+                            ? 'Collapse all app groups'
+                            : 'Expand all app groups',
+                        child: InkWell(
+                          onTap: () => _toggleAllAppAccordions(displayedApps),
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              displayedApps.isNotEmpty &&
+                                      displayedApps.every((a) => _expandedAppNames.contains(a.appName.toLowerCase()))
+                                  ? Icons.unfold_less
+                                  : Icons.unfold_more,
+                              size: 16,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Open Traffic tab',
+                        child: InkWell(
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 4,
+                          borderRadius: BorderRadius.circular(4),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.arrow_forward,
+                              size: 16,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    child: displayedApps.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: Text(
+                                'Scanning network sockets across processes...',
+                                style: TextStyle(color: colors.textMuted, fontSize: 13),
+                              ),
+                            ),
+                          )
+                        : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Accordion App Header
-                              InkWell(
-                                onTap: () => _toggleApp(app.appName.toLowerCase()),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(7),
-                                        decoration: BoxDecoration(
-                                          color: app.accentColor.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Icon(app.icon, color: app.accentColor, size: 16),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            Flexible(
-                                              child: Text(
-                                                app.displayName,
-                                                style: TextStyle(
-                                                  color: colors.textPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                              decoration: BoxDecoration(
-                                                color: colors.surfaceCard,
-                                                borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: colors.border),
-                                              ),
-                                              child: Text(
-                                                app.processCount == 1
-                                                    ? 'PID ${app.processes.first.pid}'
-                                                    : '${app.processCount} processes',
-                                                style: TextStyle(fontSize: 10, color: colors.textSecondary),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Text(
-                                        '↓ ${_formatSpeed(app.totalRxRate)}',
-                                        style: TextStyle(
-                                          color: colors.green,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: app.accentColor.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          _formatBytes(appTotalBytes),
-                                          style: TextStyle(
-                                            color: app.accentColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      AnimatedRotation(
-                                        turns: isExpanded ? 0.5 : 0.0,
-                                        duration: const Duration(milliseconds: 200),
-                                        child: Icon(
-                                          Icons.keyboard_arrow_down,
-                                          color: colors.textSecondary,
-                                          size: 18,
-                                        ),
-                                      ),
-                                    ],
+                              // Active Network Baseline Anchor
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: (connectedSsid != null ? colors.green : colors.primary)
+                                      .withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: (connectedSsid != null ? colors.green : colors.primary)
+                                        .withValues(alpha: 0.25),
                                   ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      connectedSsid != null ? Icons.wifi : Icons.network_check,
+                                      size: 15,
+                                      color: connectedSsid != null ? colors.green : colors.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        connectedSsid != null
+                                            ? 'Connected Wi-Fi: $connectedSsid • Total: ${_formatBytes(referenceNetworkBytes)}'
+                                            : 'Active Link: ${netState.primaryIface} • Total: ${_formatBytes(referenceNetworkBytes)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: colors.textPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Wi-Fi Share',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: connectedSsid != null ? colors.green : colors.primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
 
-                              // Expanded Workers Subtable (When Collapsible Tile is Opened)
-                              if (isExpanded) ...[
-                                Divider(color: colors.border, height: 1),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  child: Column(
-                                    children: app.processes.map((proc) {
-                                      final pTotal = proc.totalRxBytes + proc.totalTxBytes;
-                                      final ratio = appTotalBytes > 0
-                                          ? (pTotal / appTotalBytes).clamp(0.05, 1.0)
-                                          : 0.05;
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: displayedApps.length,
+                                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                                itemBuilder: (context, idx) {
+                                  final app = displayedApps[idx];
+                                  final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
+                                  final appTotalBytes = app.totalBytes;
+                                  final wifiSharePct = referenceNetworkBytes > 0
+                                      ? ((appTotalBytes / referenceNetworkBytes) * 100.0).clamp(0.0, 100.0)
+                                      : 0.0;
 
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 4),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: colors.surface,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: isExpanded
+                                            ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
+                                            : colors.border,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Collapsible App Header Tile ("Collision")
+                                        InkWell(
+                                          onTap: () => _toggleApp(app.appName.toLowerCase()),
+                                          borderRadius: BorderRadius.circular(10),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    'PID ${proc.pid} (${proc.openSocketCount} sockets)',
-                                                    style: TextStyle(
-                                                      color: colors.textPrimary,
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w600,
+                                                Row(
+                                                  children: [
+                                                    Container(
+                                                      padding: const EdgeInsets.all(7),
+                                                      decoration: BoxDecoration(
+                                                        color: app.accentColor.withValues(alpha: 0.15),
+                                                        borderRadius: BorderRadius.circular(8),
+                                                      ),
+                                                      child: Icon(app.icon, color: app.accentColor, size: 16),
                                                     ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Flexible(
+                                                                child: Text(
+                                                                  app.displayName,
+                                                                  style: TextStyle(
+                                                                    color: colors.textPrimary,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    fontSize: 13,
+                                                                  ),
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(width: 6),
+                                                              Container(
+                                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                                decoration: BoxDecoration(
+                                                                  color: colors.surfaceCard,
+                                                                  borderRadius: BorderRadius.circular(4),
+                                                                  border: Border.all(color: colors.border),
+                                                                ),
+                                                                child: Text(
+                                                                  app.processCount == 1
+                                                                      ? 'PID ${app.processes.first.pid}'
+                                                                      : '${app.processCount} procs',
+                                                                  style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(height: 3),
+                                                          Row(
+                                                            children: [
+                                                              Icon(Icons.wifi, size: 11, color: colors.green),
+                                                              const SizedBox(width: 3),
+                                                              Text(
+                                                                connectedSsid != null
+                                                                    ? '${wifiSharePct.toStringAsFixed(1)}% of "$connectedSsid"'
+                                                                    : '${wifiSharePct.toStringAsFixed(1)}% of Wi-Fi traffic',
+                                                                style: TextStyle(
+                                                                  fontSize: 11,
+                                                                  color: colors.green,
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                              Text(
+                                                                ' • ↓ ${_formatSpeed(app.totalRxRate)}',
+                                                                style: TextStyle(fontSize: 11, color: colors.textMuted),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    // Total Data with Wi-Fi Share
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: app.accentColor.withValues(alpha: 0.12),
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(color: app.accentColor.withValues(alpha: 0.3)),
+                                                      ),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                                        children: [
+                                                          Text(
+                                                            _formatBytes(appTotalBytes),
+                                                            style: TextStyle(
+                                                              color: app.accentColor,
+                                                              fontWeight: FontWeight.bold,
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                          Text(
+                                                            '${wifiSharePct.toStringAsFixed(1)}% share',
+                                                            style: TextStyle(
+                                                              color: colors.textSecondary,
+                                                              fontSize: 9.5,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    AnimatedRotation(
+                                                      turns: isExpanded ? 0.5 : 0.0,
+                                                      duration: const Duration(milliseconds: 200),
+                                                      child: Icon(
+                                                        Icons.keyboard_arrow_down,
+                                                        color: colors.textSecondary,
+                                                        size: 18,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                                Text(
-                                                  '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
-                                                  style: TextStyle(color: colors.textMuted, fontSize: 10),
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Text(
-                                                  _formatBytes(pTotal),
-                                                  style: TextStyle(
-                                                    color: colors.textPrimary,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
+                                                const SizedBox(height: 8),
+                                                // Proportional Wi-Fi data usage bar
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(3),
+                                                  child: LinearProgressIndicator(
+                                                    value: (wifiSharePct / 100.0).clamp(0.01, 1.0),
+                                                    minHeight: 3.5,
+                                                    backgroundColor: colors.border.withValues(alpha: 0.5),
+                                                    valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 3),
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(2),
-                                              child: LinearProgressIndicator(
-                                                value: ratio,
-                                                minHeight: 2.5,
-                                                backgroundColor: colors.border,
-                                                valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
-                                              ),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                              ],
+
+                                        // Expanded Workers Subtable (When Collapsible Tile is Opened)
+                                        if (isExpanded) ...[
+                                          Divider(color: colors.border, height: 1),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Padding(
+                                                  padding: const EdgeInsets.only(bottom: 6),
+                                                  child: Text(
+                                                    'Worker Processes (${app.processCount}) • Breakdown on ${connectedSsid ?? 'Wi-Fi Network'}',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: colors.textSecondary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                ...app.processes.map((proc) {
+                                                  final pTotal = proc.totalRxBytes + proc.totalTxBytes;
+                                                  final pShare = referenceNetworkBytes > 0
+                                                      ? ((pTotal / referenceNetworkBytes) * 100.0).clamp(0.0, 100.0)
+                                                      : 0.0;
+                                                  final ratio = appTotalBytes > 0
+                                                      ? (pTotal / appTotalBytes).clamp(0.05, 1.0)
+                                                      : 0.05;
+
+                                                  return Padding(
+                                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                'PID ${proc.pid} (${proc.openSocketCount} sockets)',
+                                                                style: TextStyle(
+                                                                  color: colors.textPrimary,
+                                                                  fontSize: 12,
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ),
+                                                            Text(
+                                                              '${pShare.toStringAsFixed(1)}% of Wi-Fi • ↓ ${_formatSpeed(proc.rxRateBps)}',
+                                                              style: TextStyle(color: colors.textMuted, fontSize: 10),
+                                                            ),
+                                                            const SizedBox(width: 10),
+                                                            Text(
+                                                              _formatBytes(pTotal),
+                                                              style: TextStyle(
+                                                                color: colors.textPrimary,
+                                                                fontSize: 11,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(height: 3),
+                                                        ClipRRect(
+                                                          borderRadius: BorderRadius.circular(2),
+                                                          child: LinearProgressIndicator(
+                                                            value: ratio,
+                                                            minHeight: 2.5,
+                                                            backgroundColor: colors.border,
+                                                            valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  )
+                    )
                 : null,
             rightChild: _showLinkDetails
                 ? ResizableCard(

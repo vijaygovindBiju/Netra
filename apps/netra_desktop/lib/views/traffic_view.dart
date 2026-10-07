@@ -93,6 +93,17 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     final colors = NetraColors.of(context);
     final trafficState = ref.watch(trafficStateProvider);
     final notifier = ref.read(trafficStateProvider.notifier);
+    final netState = ref.watch(networkStateProvider);
+
+    final metrics = netState.currentMetrics;
+    final connectedAp = netState.accessPoints.where((a) => a.isConnected).firstOrNull;
+    final connectedSsid = connectedAp?.ssid ?? (netState.accessPoints.any((a) => a.isConnected) ? netState.accessPoints.firstWhere((a) => a.isConnected).ssid : null);
+
+    final totalInterfaceBytes = (metrics?.rxBytes ?? 0) + (metrics?.txBytes ?? 0);
+    final totalAppTrafficBytes = trafficState.processes.fold<int>(0, (sum, p) => sum + p.totalRxBytes + p.totalTxBytes);
+    final referenceNetworkBytes = totalInterfaceBytes > 0
+        ? totalInterfaceBytes
+        : (totalAppTrafficBytes > 0 ? totalAppTrafficBytes : 1);
 
     // Compute totals
     int totalRxRate = 0;
@@ -357,7 +368,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
             maxHeight: 1400.0,
             padding: const EdgeInsets.all(16),
             child: _viewMode == TrafficViewMode.sameApp
-                ? _buildSameAppGroupView(namedAppGroups, colors)
+                ? _buildSameAppGroupView(namedAppGroups, colors, connectedSsid, referenceNetworkBytes)
                 : (_viewMode == TrafficViewMode.category
                     ? _buildCategoryGroupView(categoryGroups, colors)
                     : _buildFlatView(flatList, colors)),
@@ -368,7 +379,12 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
   }
 
   // 1. Grouped by Same App Name View
-  Widget _buildSameAppGroupView(List<NamedAppGroup> groups, NetraPalette colors) {
+  Widget _buildSameAppGroupView(
+    List<NamedAppGroup> groups,
+    NetraPalette colors,
+    String? connectedSsid,
+    int referenceNetworkBytes,
+  ) {
     if (groups.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
@@ -386,254 +402,351 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
       );
     }
 
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: groups.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, idx) {
-        final app = groups[idx];
-        final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
-        final appTotalBytes = app.totalBytes;
-
-        return Container(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Connected Wi-Fi Anchor Baseline Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: colors.surfaceCard,
-            borderRadius: BorderRadius.circular(14),
+            color: (connectedSsid != null ? colors.green : colors.primary).withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: isExpanded
-                  ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
-                  : colors.border,
+              color: (connectedSsid != null ? colors.green : colors.primary).withValues(alpha: 0.25),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              // Header Card for Application
-              InkWell(
-                onTap: () => _toggleApp(app.appName.toLowerCase()),
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  child: Row(
-                    children: [
-                      // App Icon
-                      Container(
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                          color: app.accentColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(app.icon, color: app.accentColor, size: 20),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // App Name & Worker Count
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                app.displayName,
-                                style: TextStyle(
-                                  color: colors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colors.surface,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: colors.border),
-                              ),
-                              child: Text(
-                                app.processCount == 1
-                                    ? 'PID ${app.processes.first.pid}'
-                                    : '${app.processCount} processes (${app.totalSockets} sockets)',
-                                style: TextStyle(
-                                  color: colors.textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Aggregate Speed
-                      Text(
-                        '↓ ${_formatSpeed(app.totalRxRate)} • ↑ ${_formatSpeed(app.totalTxRate)}',
-                        style: TextStyle(
-                          color: colors.green,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-
-                      // Aggregate Total Data
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: app.accentColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _formatBytes(appTotalBytes),
-                          style: TextStyle(
-                            color: app.accentColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-
-                      // Rotating Chevron
-                      AnimatedRotation(
-                        turns: isExpanded ? 0.5 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          color: colors.textSecondary,
-                          size: 20,
-                        ),
-                      ),
-                    ],
+              Icon(
+                connectedSsid != null ? Icons.wifi : Icons.network_check,
+                size: 16,
+                color: connectedSsid != null ? colors.green : colors.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  connectedSsid != null
+                      ? 'Connected Wi-Fi: $connectedSsid • Total Reference Traffic: ${_formatBytes(referenceNetworkBytes)}'
+                      : 'Active Link Reference: ${_formatBytes(referenceNetworkBytes)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textPrimary,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              Text(
+                'Wi-Fi Share Baseline',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: connectedSsid != null ? colors.green : colors.primary,
+                ),
+              ),
+            ],
+          ),
+        ),
 
-              // Expanded Child Worker PIDs
-              if (isExpanded) ...[
-                Divider(color: colors.border, height: 1),
-                Padding(
-                  padding: const EdgeInsets.only(top: 6, bottom: 8),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: app.processes.length,
-                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
-                    itemBuilder: (context, pIdx) {
-                      final proc = app.processes[pIdx];
-                      final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
-                      final ratio = (appTotalBytes > 0)
-                          ? (procTotalBytes / appTotalBytes).clamp(0.05, 1.0)
-                          : 0.05;
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: groups.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
+          itemBuilder: (context, idx) {
+            final app = groups[idx];
+            final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
+            final appTotalBytes = app.totalBytes;
+            final wifiSharePct = referenceNetworkBytes > 0
+                ? ((appTotalBytes / referenceNetworkBytes) * 100.0).clamp(0.0, 100.0)
+                : 0.0;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+            return Container(
+              decoration: BoxDecoration(
+                color: colors.surfaceCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isExpanded
+                      ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
+                      : colors.border,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Card for Application
+                  InkWell(
+                    onTap: () => _toggleApp(app.appName.toLowerCase()),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          // App Icon
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: app.accentColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(app.icon, color: app.accentColor, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // App Name & Worker Count
+                          Expanded(
+                            child: Row(
                               children: [
-                                // PID and Command line
-                                Expanded(
-                                  flex: 4,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: colors.surface,
-                                              borderRadius: BorderRadius.circular(4),
-                                              border: Border.all(color: colors.border),
-                                            ),
-                                            child: Text(
-                                              'PID ${proc.pid}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                                color: colors.textPrimary,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '${proc.openSocketCount} open sockets',
-                                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        proc.cmdline.isNotEmpty ? proc.cmdline : proc.name,
-                                        style: TextStyle(color: colors.textMuted, fontSize: 11),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Speed
-                                Expanded(
-                                  flex: 3,
+                                Flexible(
                                   child: Text(
-                                    '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
+                                    app.displayName,
                                     style: TextStyle(
-                                      color: colors.green,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 11,
+                                      color: colors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-
-                                // Data
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        _formatBytes(procTotalBytes),
-                                        style: TextStyle(
-                                          color: colors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        '↓ ${_formatBytes(proc.totalRxBytes)}',
-                                        style: TextStyle(color: colors.textMuted, fontSize: 10),
-                                      ),
-                                    ],
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colors.surface,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: colors.border),
+                                  ),
+                                  child: Text(
+                                    app.processCount == 1
+                                        ? 'PID ${app.processes.first.pid}'
+                                        : '${app.processCount} PIDs',
+                                    style: TextStyle(
+                                      color: colors.textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            // Proportion bar
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: ratio,
-                                minHeight: 3,
-                                backgroundColor: colors.border,
-                                valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
+                          ),
+
+                          // Wi-Fi Share Percentage Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: colors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: colors.green.withValues(alpha: 0.25)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.wifi, size: 12, color: colors.green),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${wifiSharePct.toStringAsFixed(1)}% of ${connectedSsid ?? "Wi-Fi"}',
+                                  style: TextStyle(
+                                    color: colors.green,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Aggregate Speed
+                          Text(
+                            '↓ ${_formatSpeed(app.totalRxRate)} • ↑ ${_formatSpeed(app.totalTxRate)}',
+                            style: TextStyle(
+                              color: colors.green,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+
+                          // Aggregate Total Data
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: app.accentColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _formatBytes(appTotalBytes),
+                              style: TextStyle(
+                                color: app.accentColor,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Rotating Chevron
+                          AnimatedRotation(
+                            turns: isExpanded ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              color: colors.textSecondary,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
+
+                  // Proportional Wi-Fi Progress Bar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: (wifiSharePct / 100.0).clamp(0.01, 1.0),
+                        minHeight: 3.5,
+                        backgroundColor: colors.border.withValues(alpha: 0.5),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          wifiSharePct > 20 ? colors.amber : app.accentColor,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Expanded Child Worker PIDs
+                  if (isExpanded) ...[
+                    Divider(color: colors.border, height: 1),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, bottom: 8),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: app.processes.length,
+                        separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
+                        itemBuilder: (context, pIdx) {
+                          final proc = app.processes[pIdx];
+                          final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
+                          final ratio = (appTotalBytes > 0)
+                              ? (procTotalBytes / appTotalBytes).clamp(0.05, 1.0)
+                              : 0.05;
+                          final pidWifiShare = referenceNetworkBytes > 0
+                              ? ((procTotalBytes / referenceNetworkBytes) * 100.0).clamp(0.0, 100.0)
+                              : 0.0;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    // PID and Command line
+                                    Expanded(
+                                      flex: 4,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: colors.surface,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: colors.border),
+                                                ),
+                                                child: Text(
+                                                  'PID ${proc.pid}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: colors.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '${proc.openSocketCount} open sockets',
+                                                style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            proc.cmdline.isNotEmpty ? proc.cmdline : proc.name,
+                                            style: TextStyle(color: colors.textMuted, fontSize: 11),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Speed
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
+                                        style: TextStyle(
+                                          color: colors.green,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+
+                                    // Data & Wi-Fi Share
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            _formatBytes(procTotalBytes),
+                                            style: TextStyle(
+                                              color: colors.textPrimary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${pidWifiShare.toStringAsFixed(1)}% of Wi-Fi',
+                                            style: TextStyle(color: colors.green, fontSize: 10, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                // Proportion bar
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: ratio,
+                                    minHeight: 3,
+                                    backgroundColor: colors.border,
+                                    valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
