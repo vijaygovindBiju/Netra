@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A0E17"/>
+      <stop offset="50%" stop-color="#111927"/>
+      <stop offset="100%" stop-color="#06090F"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE"/>
+      <stop offset="100%" stop-color="#4FACFE"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <radialGradient id="pupilGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F2FE" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#00F2FE" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00F2FE" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background Base Container -->
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bgGrad)" stroke="#1F293D" stroke-width="3"/>
+
+  <!-- Subtle Cyber Tech Grid Circles -->
+  <circle cx="128" cy="128" r="88" fill="none" stroke="#1E293B" stroke-width="1.5" stroke-dasharray="4 8"/>
+  <circle cx="128" cy="128" r="66" fill="none" stroke="#2A374D" stroke-width="1" stroke-dasharray="2 4"/>
+
+  <!-- Outer Stylized Eye Arcs (Netra) -->
+  <path d="M 40,128 C 72,72 184,72 216,128 C 184,184 72,184 40,128 Z" 
+        fill="none" stroke="url(#purpleGrad)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+
+  <!-- Wi-Fi Waves emanating from Upper Lid -->
+  <path d="M 88,96 C 100,82 114,76 128,76 C 142,76 156,82 168,96" 
+        fill="none" stroke="url(#cyanGrad)" stroke-width="4" stroke-linecap="round" filter="url(#neonGlow)"/>
+  <path d="M 102,108 C 110,99 119,95 128,95 C 137,95 146,99 154,108" 
+        fill="none" stroke="url(#cyanGrad)" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- Audio Equalizer Waveform in Lower Lid -->
+  <rect x="92" y="146" width="4" height="16" rx="2" fill="#00F2FE" opacity="0.7"/>
+  <rect x="104" y="140" width="4" height="28" rx="2" fill="#38BDF8"/>
+  <rect x="116" y="134" width="4" height="40" rx="2" fill="#818CF8"/>
+  <rect x="128" y="130" width="4" height="48" rx="2" fill="#C084FC" filter="url(#neonGlow)"/>
+  <rect x="140" y="136" width="4" height="36" rx="2" fill="#818CF8"/>
+  <rect x="152" y="142" width="4" height="24" rx="2" fill="#38BDF8"/>
+  <rect x="164" y="148" width="4" height="12" rx="2" fill="#00F2FE" opacity="0.7"/>
+
+  <!-- Glowing Iris Ring & Central Core (Radar Eye) -->
+  <circle cx="128" cy="128" r="32" fill="none" stroke="url(#cyanGrad)" stroke-width="4" filter="url(#neonGlow)"/>
+  <circle cx="128" cy="128" r="22" fill="url(#pupilGlow)"/>
+  <circle cx="128" cy="128" r="10" fill="#00F2FE"/>
+  <circle cx="128" cy="128" r="4" fill="#FFFFFF"/>
+</svg>

@@ -1,0 +1,73 @@
+# Maintainer: Netra Project <netra-devel@linux.local>
+pkgname=netra-git
+pkgver=1.0.0.r0
+pkgrel=1
+pkgdesc="Unified Linux Control Center for Wi-Fi, Hotspot, Bluetooth, PipeWire Audio and QoS"
+arch=('x86_64')
+url="https://github.com/netra-linux/netra"
+license=('Apache-2.0' 'MIT')
+depends=(
+    'systemd'
+    'networkmanager'
+    'bluez'
+    'pipewire'
+    'pipewire-pulse'
+    'iproute2'
+    'polkit'
+    'gtk3'
+)
+makedepends=(
+    'git'
+    'rust'
+    'cargo'
+    'flutter'
+    'clang'
+    'cmake'
+    'ninja'
+    'pkgconf'
+)
+provides=('netra' 'netrad')
+conflicts=('netra')
+source=()
+sha256sums=()
+
+build() {
+    cd "${startdir}/../.."
+
+    msg2 "Building Netra backend daemon..."
+    cargo build --release --workspace
+
+    msg2 "Building Netra Desktop Flutter GUI..."
+    cd apps/netra_desktop
+    flutter pub get
+    flutter build linux --release
+}
+
+package() {
+    local root_dir="${startdir}/../.."
+    
+    # Daemon binary
+    install -Dm755 "${root_dir}/target/release/netra-daemon" "${pkgdir}/usr/local/bin/netrad"
+
+    # System configs
+    install -Dm644 "${root_dir}/data/dbus/org.netra.Control.conf" "${pkgdir}/usr/share/dbus-1/system.d/org.netra.Control.conf"
+    install -Dm644 "${root_dir}/data/polkit/org.netra.policy" "${pkgdir}/usr/share/polkit-1/actions/org.netra.policy"
+    install -Dm644 "${root_dir}/data/systemd/netra-daemon.service" "${pkgdir}/usr/lib/systemd/system/netra-daemon.service"
+
+    # Desktop app bundle
+    install -d "${pkgdir}/opt/netra"
+    cp -r "${root_dir}/apps/netra_desktop/build/linux/x64/release/bundle/"* "${pkgdir}/opt/netra/"
+    chmod 755 "${pkgdir}/opt/netra/netra_desktop"
+
+    # Launcher wrapper script
+    install -d "${pkgdir}/usr/local/bin"
+    cat << 'EOF' > "${pkgdir}/usr/local/bin/netra-desktop"
+#!/usr/bin/env bash
+exec /opt/netra/netra_desktop "$@"
+EOF
+    chmod 755 "${pkgdir}/usr/local/bin/netra-desktop"
+
+    # Desktop entry & Icon
+    install -Dm644 "${root_dir}/data/desktop/netra.desktop" "${pkgdir}/usr/share/applications/netra.desktop"
+    install -Dm644 "${root_dir}/data/icons/hicolor/scalable/apps/netra.svg" "${pkgdir}/usr/share/icons/hicolor/scalable/apps/netra.svg"
+}

@@ -1,0 +1,26 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock.backup
+
+# Flutter & Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+/apps/netra_desktop/build/
+/apps/netra_desktop/.dart_tool/
+/apps/netra_desktop/.flutter-plugins
+/apps/netra_desktop/.flutter-plugins-dependencies
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs & Temp files
+*.log
+/tmp/

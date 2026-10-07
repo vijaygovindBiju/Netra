@@ -1,0 +1,24 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release --workspace
+	cd apps/netra_desktop && flutter pub get && flutter build linux --release
+
+override_dh_auto_install:
+	dh_auto_install
+	install -d debian/netra/usr/local/bin
+	install -m 755 target/release/netra-daemon debian/netra/usr/local/bin/netrad
+	install -d debian/netra/opt/netra
+	cp -r apps/netra_desktop/build/linux/x64/release/bundle/* debian/netra/opt/netra/
+	install -d debian/netra/usr/share/dbus-1/system.d
+	install -m 644 data/dbus/org.netra.Control.conf debian/netra/usr/share/dbus-1/system.d/
+	install -d debian/netra/usr/share/polkit-1/actions
+	install -m 644 data/polkit/org.netra.policy debian/netra/usr/share/polkit-1/actions/
+	install -d debian/netra/lib/systemd/system
+	install -m 644 data/systemd/netra-daemon.service debian/netra/lib/systemd/system/
+	install -d debian/netra/usr/share/applications
+	install -m 644 data/desktop/netra.desktop debian/netra/usr/share/applications/
+	install -d debian/netra/usr/share/icons/hicolor/scalable/apps
+	install -m 644 data/icons/hicolor/scalable/apps/netra.svg debian/netra/usr/share/icons/hicolor/scalable/apps/

@@ -1,0 +1,37 @@
+[Desktop Entry]
+Version=1.0
+Name=Netra
+GenericName=Connectivity & Audio Control Center
+Comment=Unified Linux Control Center for Wi-Fi, Hotspot, Bluetooth, PipeWire Audio and QoS
+Exec=/usr/local/bin/netra-desktop
+Icon=netra
+Terminal=false
+Type=Application
+Categories=Network;AudioVideo;System;Settings;HardwareSettings;
+Keywords=wifi;hotspot;bluetooth;audio;pipewire;network;traffic;qos;bandwidth;tethering;
+StartupWMClass=netra_desktop
+Actions=Dashboard;WiFi;Hotspot;Bluetooth;Traffic;Audio;
+
+[Desktop Action Dashboard]
+Name=Open Dashboard
+Exec=/usr/local/bin/netra-desktop --view=dashboard
+
+[Desktop Action WiFi]
+Name=Wi-Fi Networks
+Exec=/usr/local/bin/netra-desktop --view=wifi
+
+[Desktop Action Hotspot]
+Name=Hotspot Manager
+Exec=/usr/local/bin/netra-desktop --view=hotspot
+
+[Desktop Action Bluetooth]
+Name=Bluetooth Devices
+Exec=/usr/local/bin/netra-desktop --view=bluetooth
+
+[Desktop Action Traffic]
+Name=Network Traffic & QoS
+Exec=/usr/local/bin/netra-desktop --view=traffic
+
+[Desktop Action Audio]
+Name=Audio Routing Matrix
+Exec=/usr/local/bin/netra-desktop --view=audio
