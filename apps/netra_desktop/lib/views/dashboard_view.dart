@@ -4,8 +4,15 @@ import '../models/traffic_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
 
-class DashboardView extends ConsumerWidget {
+class DashboardView extends ConsumerStatefulWidget {
   const DashboardView({super.key});
+
+  @override
+  ConsumerState<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends ConsumerState<DashboardView> {
+  final Set<AppCategoryType> _expandedCategories = {};
 
   String _formatSpeed(int bps) {
     if (bps < 1024) return '$bps B/s';
@@ -20,8 +27,18 @@ class DashboardView extends ConsumerWidget {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
+  void _toggleCategory(AppCategoryType type) {
+    setState(() {
+      if (_expandedCategories.contains(type)) {
+        _expandedCategories.remove(type);
+      } else {
+        _expandedCategories.add(type);
+      }
+    });
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colors = NetraColors.of(context);
     final netState = ref.watch(networkStateProvider);
     final hsState = ref.watch(hotspotStateProvider);
@@ -31,18 +48,9 @@ class DashboardView extends ConsumerWidget {
     final rxSpeed = _formatSpeed(metrics?.rxRateBps ?? 0);
     final txSpeed = _formatSpeed(metrics?.txRateBps ?? 0);
 
-    // Sort processes by total data consumption or current rate
-    final sortedProcesses = List<ProcessTrafficItem>.from(trafficState.processes)
-      ..sort((a, b) {
-        final totalA = a.totalRxBytes + a.totalTxBytes;
-        final totalB = b.totalRxBytes + b.totalTxBytes;
-        return totalB.compareTo(totalA);
-      });
-    final topProcesses = sortedProcesses.take(5).toList();
-
-    final maxBytes = topProcesses.isNotEmpty
-        ? (topProcesses.first.totalRxBytes + topProcesses.first.totalTxBytes)
-        : 1;
+    // Group processes by category
+    final appGroups = AppCategorizer.groupProcesses(trafficState.processes);
+    final topGroups = appGroups.take(4).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -156,7 +164,7 @@ class DashboardView extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // 2. Middle Section: Application Data Usage & Interface Details
+          // 2. Middle Section: Application Data Usage (Collapsible Categories) & Interface Details
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -191,7 +199,7 @@ class DashboardView extends ConsumerWidget {
                           TextButton.icon(
                             onPressed: () => ref.read(activeTabProvider.notifier).state = 4,
                             icon: const Icon(Icons.arrow_forward, size: 14),
-                            label: const Text('View All'),
+                            label: const Text('View All in Traffic'),
                             style: TextButton.styleFrom(
                               foregroundColor: colors.primary,
                               visualDensity: VisualDensity.compact,
@@ -200,7 +208,7 @@ class DashboardView extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      if (topProcesses.isEmpty)
+                      if (topGroups.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Center(
@@ -214,100 +222,176 @@ class DashboardView extends ConsumerWidget {
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: topProcesses.length,
-                          separatorBuilder: (_, __) => Divider(color: colors.border, height: 16),
+                          itemCount: topGroups.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, idx) {
-                            final proc = topProcesses[idx];
-                            final totalBytes = proc.totalRxBytes + proc.totalTxBytes;
-                            final ratio = (maxBytes > 0)
-                                ? (totalBytes / maxBytes).clamp(0.05, 1.0)
-                                : 0.05;
+                            final group = topGroups[idx];
+                            final isExpanded = _expandedCategories.contains(group.type);
+                            final groupTotalBytes = group.totalBytes;
 
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 14,
-                                      backgroundColor: colors.secondary.withValues(alpha: 0.15),
-                                      child: Icon(Icons.memory, color: colors.secondary, size: 14),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isExpanded
+                                      ? group.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
+                                      : colors.border,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Accordion Category Header
+                                  InkWell(
+                                    onTap: () => _toggleCategory(group.type),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      child: Row(
                                         children: [
-                                          Row(
-                                            children: [
-                                              Flexible(
-                                                child: Text(
-                                                  proc.name,
-                                                  style: TextStyle(
-                                                    color: colors.textPrimary,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                decoration: BoxDecoration(
-                                                  color: colors.surface,
-                                                  borderRadius: BorderRadius.circular(4),
-                                                  border: Border.all(color: colors.border),
-                                                ),
-                                                child: Text(
-                                                  'PID ${proc.pid}',
-                                                  style: TextStyle(fontSize: 10, color: colors.textSecondary),
-                                                ),
-                                              ),
-                                            ],
+                                          Container(
+                                            padding: const EdgeInsets.all(7),
+                                            decoration: BoxDecoration(
+                                              color: group.accentColor.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(group.icon, color: group.accentColor, size: 16),
                                           ),
-                                          const SizedBox(height: 2),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Row(
+                                              children: [
+                                                Flexible(
+                                                  child: Text(
+                                                    group.title,
+                                                    style: TextStyle(
+                                                      color: colors.textPrimary,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: colors.surfaceCard,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    border: Border.all(color: colors.border),
+                                                  ),
+                                                  child: Text(
+                                                    '${group.processes.length} apps',
+                                                    style: TextStyle(fontSize: 10, color: colors.textSecondary),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
                                           Text(
-                                            '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
-                                            style: TextStyle(fontSize: 11, color: colors.textMuted),
-                                            overflow: TextOverflow.ellipsis,
+                                            '↓ ${_formatSpeed(group.totalRxRate)}',
+                                            style: TextStyle(
+                                              color: colors.green,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: group.accentColor.withValues(alpha: 0.12),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              _formatBytes(groupTotalBytes),
+                                              style: TextStyle(
+                                                color: group.accentColor,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 11,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          AnimatedRotation(
+                                            turns: isExpanded ? 0.5 : 0.0,
+                                            duration: const Duration(milliseconds: 200),
+                                            child: Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: colors.textSecondary,
+                                              size: 18,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
-                                      children: [
-                                        Text(
-                                          _formatBytes(totalBytes),
-                                          style: TextStyle(
-                                            color: colors.primary,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        Text(
-                                          '${proc.openSocketCount} sockets',
-                                          style: TextStyle(color: colors.textMuted, fontSize: 11),
-                                        ),
-                                      ],
+                                  ),
+
+                                  // Expanded Apps Subtable
+                                  if (isExpanded) ...[
+                                    Divider(color: colors.border, height: 1),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      child: Column(
+                                        children: group.processes.map((proc) {
+                                          final pTotal = proc.totalRxBytes + proc.totalTxBytes;
+                                          final ratio = groupTotalBytes > 0
+                                              ? (pTotal / groupTotalBytes).clamp(0.05, 1.0)
+                                              : 0.05;
+
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 4),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        '${proc.name} (PID ${proc.pid})',
+                                                        style: TextStyle(
+                                                          color: colors.textPrimary,
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
+                                                      style: TextStyle(color: colors.textMuted, fontSize: 10),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Text(
+                                                      _formatBytes(pTotal),
+                                                      style: TextStyle(
+                                                        color: colors.textPrimary,
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(height: 3),
+                                                ClipRRect(
+                                                  borderRadius: BorderRadius.circular(2),
+                                                  child: LinearProgressIndicator(
+                                                    value: ratio,
+                                                    minHeight: 2.5,
+                                                    backgroundColor: colors.border,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(group.accentColor),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
                                     ),
                                   ],
-                                ),
-                                const SizedBox(height: 6),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: LinearProgressIndicator(
-                                    value: ratio,
-                                    minHeight: 4,
-                                    backgroundColor: colors.border,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      idx == 0 ? colors.primary : colors.secondary,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             );
                           },
                         ),
