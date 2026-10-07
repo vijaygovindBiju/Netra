@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/traffic_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
+import '../widgets/resizable_layout.dart';
 
 enum TrafficViewMode {
   sameApp,
@@ -344,12 +345,23 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
           const SizedBox(height: 16),
 
           // Main Content View based on Selected ViewMode
-          if (_viewMode == TrafficViewMode.sameApp)
-            _buildSameAppGroupView(namedAppGroups, colors)
-          else if (_viewMode == TrafficViewMode.category)
-            _buildCategoryGroupView(categoryGroups, colors)
-          else
-            _buildFlatView(flatList, colors),
+          ResizableCard(
+            title: _viewMode == TrafficViewMode.sameApp
+                ? 'Applications (${namedAppGroups.length} Process Groups)'
+                : (_viewMode == TrafficViewMode.category
+                    ? 'Categories (${categoryGroups.length} Groups)'
+                    : 'Process List (${flatList.length} Processes)'),
+            icon: Icons.list_alt,
+            initialHeight: 560.0,
+            minHeight: 250.0,
+            maxHeight: 1400.0,
+            padding: const EdgeInsets.all(16),
+            child: _viewMode == TrafficViewMode.sameApp
+                ? _buildSameAppGroupView(namedAppGroups, colors)
+                : (_viewMode == TrafficViewMode.category
+                    ? _buildCategoryGroupView(categoryGroups, colors)
+                    : _buildFlatView(flatList, colors)),
+          ),
         ],
       ),
     );
@@ -378,7 +390,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: groups.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, idx) {
         final app = groups[idx];
         final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
@@ -507,7 +519,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: app.processes.length,
-                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, pIdx) {
                       final proc = app.processes[pIdx];
                       final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
@@ -648,7 +660,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: groups.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, idx) {
         final group = groups[idx];
         final isExpanded = _expandedCategories.contains(group.type);
@@ -760,7 +772,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: group.processes.length,
-                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, pIdx) {
                       final proc = group.processes[pIdx];
                       final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
@@ -869,7 +881,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: list.length,
-                  separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                  separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                   itemBuilder: (context, idx) {
                     final proc = list[idx];
                     final totalProcBytes = proc.totalRxBytes + proc.totalTxBytes;
@@ -1016,7 +1028,7 @@ class _ViewModeButton extends StatelessWidget {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
+class _SummaryCard extends StatefulWidget {
   final String title;
   final String value;
   final String subtext;
@@ -1034,53 +1046,129 @@ class _SummaryCard extends StatelessWidget {
   });
 
   @override
+  State<_SummaryCard> createState() => _SummaryCardState();
+}
+
+class _SummaryCardState extends State<_SummaryCard> {
+  static const double _initialHeight = 115.0;
+  double? _height;
+  bool _isDragging = false;
+  bool _isHovering = false;
+
+  @override
   Widget build(BuildContext context) {
+    final curH = _height ?? _initialHeight;
+
     return Container(
-      padding: const EdgeInsets.all(18),
+      height: curH,
       decoration: BoxDecoration(
-        color: colors.surfaceCard,
+        color: widget.colors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.border),
+        border: Border.all(
+          color: _isDragging ? widget.colors.primary.withValues(alpha: 0.6) : widget.colors.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 18, right: 18, top: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: widget.colors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: widget.iconColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(widget.icon, color: widget.iconColor, size: 15),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      widget.value,
+                      style: TextStyle(
+                        color: widget.colors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    widget.subtext,
+                    style: TextStyle(
+                      color: widget.colors.textMuted,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const Spacer(),
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: iconColor, size: 15),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              color: colors.textPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtext,
-            style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 11,
+          // Interactive bottom drag handle
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeRow,
+            onEnter: (_) => setState(() => _isHovering = true),
+            onExit: (_) => setState(() => _isHovering = false),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onDoubleTap: () => setState(() => _height = _initialHeight),
+              onVerticalDragStart: (_) => setState(() => _isDragging = true),
+              onVerticalDragEnd: (_) => setState(() => _isDragging = false),
+              onVerticalDragUpdate: (details) {
+                setState(() {
+                  final next = (curH + details.delta.dy).clamp(90.0, 240.0);
+                  _height = next;
+                });
+              },
+              child: Tooltip(
+                message: 'Drag to resize card (${curH.toInt()}px) • Double-click to reset',
+                waitDuration: const Duration(milliseconds: 300),
+                child: Container(
+                  height: 14,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _isDragging || _isHovering
+                        ? widget.colors.primary.withValues(alpha: 0.08)
+                        : Colors.transparent,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: _isDragging || _isHovering ? 32 : 18,
+                    height: 2.5,
+                    decoration: BoxDecoration(
+                      color: _isDragging
+                          ? widget.colors.primary
+                          : (_isHovering ? widget.colors.primary.withValues(alpha: 0.7) : widget.colors.border),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -1088,3 +1176,4 @@ class _SummaryCard extends StatelessWidget {
     );
   }
 }
+

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/audio_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
+import '../widgets/resizable_layout.dart';
 
 class AudioView extends ConsumerStatefulWidget {
   const AudioView({super.key});
@@ -86,7 +87,7 @@ class _AudioViewState extends ConsumerState<AudioView> {
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: sinks.where((s) => !s.isVirtual).length,
-                        separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                        separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                         itemBuilder: (context, idx) {
                           final sink = sinks.where((s) => !s.isVirtual).toList()[idx];
                           final isSelected = _selectedMultiSinkSlaves.contains(sink.name);
@@ -197,33 +198,15 @@ class _AudioViewState extends ConsumerState<AudioView> {
           const SizedBox(height: 20),
 
           // 1. Application Audio Stream Routing Matrix
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: colors.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.alt_route, color: colors.primary, size: 20),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Per-Application Audio Routing Matrix',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                if (audioState.streams.isEmpty)
-                  Padding(
+          ResizableCard(
+            title: 'Per-Application Audio Routing Matrix (${audioState.streams.length})',
+            icon: Icons.alt_route,
+            initialHeight: 360.0,
+            minHeight: 180.0,
+            maxHeight: 900.0,
+            padding: const EdgeInsets.all(16),
+            child: audioState.streams.isEmpty
+                ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
@@ -232,12 +215,11 @@ class _AudioViewState extends ConsumerState<AudioView> {
                       ),
                     ),
                   )
-                else
-                  ListView.separated(
+                : ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: audioState.streams.length,
-                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 12),
+                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
                     itemBuilder: (context, idx) {
                       final stream = audioState.streams[idx];
                       return Padding(
@@ -316,42 +298,22 @@ class _AudioViewState extends ConsumerState<AudioView> {
                       );
                     },
                   ),
-              ],
-            ),
           ),
           const SizedBox(height: 20),
 
           // 2. Physical & Virtual Audio Sinks Panel
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: colors.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.speaker_group, color: colors.secondary, size: 20),
-                    const SizedBox(width: 10),
-                    Text(
-                      'Audio Output Endpoints & Latency Sync',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: colors.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                ListView.separated(
+          ResizableCard(
+            title: 'Audio Output Endpoints & Latency Sync (${audioState.sinks.length})',
+            icon: Icons.speaker_group,
+            initialHeight: 380.0,
+            minHeight: 180.0,
+            maxHeight: 900.0,
+            padding: const EdgeInsets.all(16),
+            child: ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: audioState.sinks.length,
-                  separatorBuilder: (_, __) => Divider(color: colors.border, height: 16),
+                  separatorBuilder: (_, _) => Divider(color: colors.border, height: 16),
                   itemBuilder: (context, idx) {
                     final sink = audioState.sinks[idx];
                     return Column(
@@ -435,8 +397,6 @@ class _AudioViewState extends ConsumerState<AudioView> {
                     );
                   },
                 ),
-              ],
-            ),
           ),
         ],
       ),

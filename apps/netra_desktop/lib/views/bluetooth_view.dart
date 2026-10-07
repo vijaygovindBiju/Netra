@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/bluetooth_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
+import '../widgets/resizable_layout.dart';
 
 class BluetoothView extends ConsumerWidget {
   const BluetoothView({super.key});
@@ -91,12 +91,13 @@ class BluetoothView extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Connected & Paired Devices Section
-          Container(
-            decoration: BoxDecoration(
-              color: colors.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border),
-            ),
+          ResizableCard(
+            title: 'Bluetooth Devices (${btState.devices.length})',
+            icon: Icons.bluetooth,
+            initialHeight: 460.0,
+            minHeight: 220.0,
+            maxHeight: 1000.0,
+            padding: EdgeInsets.zero,
             child: btState.devices.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40),
@@ -117,7 +118,7 @@ class BluetoothView extends ConsumerWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: btState.devices.length,
-                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, idx) {
                       final device = btState.devices[idx];
                       return ListTile(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/network_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
+import '../widgets/resizable_layout.dart';
 
 class WifiView extends ConsumerStatefulWidget {
   const WifiView({super.key});
@@ -315,12 +316,13 @@ class _WifiViewState extends ConsumerState<WifiView> {
           const SizedBox(height: 16),
 
           // Available APs List
-          Container(
-            decoration: BoxDecoration(
-              color: colors.surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border),
-            ),
+          ResizableCard(
+            title: 'Available Networks (${filteredAps.length})',
+            icon: Icons.wifi,
+            initialHeight: 480.0,
+            minHeight: 220.0,
+            maxHeight: 1100.0,
+            padding: EdgeInsets.zero,
             child: filteredAps.isEmpty
                 ? Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40),
@@ -335,7 +337,7 @@ class _WifiViewState extends ConsumerState<WifiView> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: filteredAps.length,
-                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                    separatorBuilder: (_, _) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, idx) {
                       final ap = filteredAps[idx];
                       final isConnected = ap.isConnected;

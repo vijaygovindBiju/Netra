@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:netra_desktop/main.dart';
-import 'package:netra_desktop/providers/netra_providers.dart';
 
 void main() {
   testWidgets('NetraApp smoke test and theme toggle', (WidgetTester tester) async {

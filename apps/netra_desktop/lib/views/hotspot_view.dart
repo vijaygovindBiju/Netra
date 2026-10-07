@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
+import '../widgets/resizable_layout.dart';
 
 class HotspotView extends ConsumerStatefulWidget {
   const HotspotView({super.key});
@@ -170,40 +171,23 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
           ),
           const SizedBox(height: 20),
 
-          // Configuration and Connected Clients Row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Hotspot Configuration Settings
-              Expanded(
-                flex: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceCard,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.tune, color: colors.primary, size: 20),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Configuration',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: colors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // SSID Field
+          // Configuration and Connected Clients Resizable Split
+          ResizableSplitRow(
+            initialRatio: 0.42,
+            minRatio: 0.28,
+            maxRatio: 0.70,
+            spacing: 20.0,
+            leftChild: ResizableCard(
+              title: 'Configuration',
+              icon: Icons.tune,
+              initialHeight: 480.0,
+              minHeight: 280.0,
+              maxHeight: 1000.0,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // SSID Field
                       Text('Network Name (SSID)', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
                       const SizedBox(height: 6),
                       TextField(
@@ -288,54 +272,31 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SizedBox(width: 20),
-
-              // 2. Connected Clients & QoS Management
-              Expanded(
-                flex: 6,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
+            ),
+            rightChild: ResizableCard(
+              title: 'Connected Devices & QoS',
+              icon: Icons.devices,
+              initialHeight: 480.0,
+              minHeight: 280.0,
+              maxHeight: 1000.0,
+              padding: const EdgeInsets.all(16),
+              headerActions: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
-                    color: colors.surfaceCard,
-                    borderRadius: BorderRadius.circular(14),
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: colors.border),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.devices, color: colors.secondary, size: 20),
-                              const SizedBox(width: 10),
-                              Text(
-                                'Connected Devices & QoS',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: colors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: colors.surface,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: colors.border),
-                            ),
-                            child: Text(
-                              '${hsState.clients.length} Devices',
-                              style: TextStyle(fontSize: 11, color: colors.primary),
-                            ),
-                          ),
-                        ],
-                      ),
+                  child: Text(
+                    '${hsState.clients.length} Devices',
+                    style: TextStyle(fontSize: 11, color: colors.primary),
+                  ),
+                ),
+              ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                       const SizedBox(height: 14),
 
                       if (hsState.clients.isEmpty)
@@ -361,7 +322,7 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: hsState.clients.length,
-                          separatorBuilder: (_, __) => Divider(color: colors.border, height: 12),
+                          separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
                           itemBuilder: (context, idx) {
                             final client = hsState.clients[idx];
                             return Padding(
@@ -426,9 +387,7 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                         ),
                     ],
                   ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
