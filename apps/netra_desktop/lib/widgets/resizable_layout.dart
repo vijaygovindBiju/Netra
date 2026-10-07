@@ -4,8 +4,8 @@ import '../theme/netra_theme.dart';
 /// Interactive Resizable Split Row with Draggable Divider.
 /// Allows side-by-side widgets to be resized horizontally by dragging the divider.
 class ResizableSplitRow extends StatefulWidget {
-  final Widget leftChild;
-  final Widget rightChild;
+  final Widget? leftChild;
+  final Widget? rightChild;
   final double initialRatio;
   final double minRatio;
   final double maxRatio;
@@ -14,8 +14,8 @@ class ResizableSplitRow extends StatefulWidget {
 
   const ResizableSplitRow({
     super.key,
-    required this.leftChild,
-    required this.rightChild,
+    this.leftChild,
+    this.rightChild,
     this.initialRatio = 0.55,
     this.minRatio = 0.20,
     this.maxRatio = 0.80,
@@ -48,6 +48,16 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
   Widget build(BuildContext context) {
     final colors = NetraColors.of(context);
 
+    if (widget.leftChild == null && widget.rightChild == null) {
+      return const SizedBox.shrink();
+    }
+    if (widget.leftChild != null && widget.rightChild == null) {
+      return widget.leftChild!;
+    }
+    if (widget.leftChild == null && widget.rightChild != null) {
+      return widget.rightChild!;
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
@@ -57,9 +67,9 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              widget.leftChild,
+              widget.leftChild!,
               SizedBox(height: widget.spacing),
-              widget.rightChild,
+              widget.rightChild!,
             ],
           );
         }
@@ -81,7 +91,7 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
             // Left Widget
             SizedBox(
               width: leftWidth,
-              child: widget.leftChild,
+              child: widget.leftChild!,
             ),
             SizedBox(width: widget.spacing / 2),
 
@@ -106,12 +116,12 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
                   waitDuration: const Duration(milliseconds: 400),
                   child: Container(
                     width: dividerWidth,
-                    height: 220,
+                    height: 80,
                     alignment: Alignment.center,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
                       width: _isHovering || _isDragging ? 6 : 3,
-                      height: _isHovering || _isDragging ? 64 : 36,
+                      height: _isHovering || _isDragging ? 54 : 32,
                       decoration: BoxDecoration(
                         color: _isDragging
                             ? colors.primary
@@ -137,7 +147,7 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
             // Right Widget
             SizedBox(
               width: rightWidth,
-              child: widget.rightChild,
+              child: widget.rightChild!,
             ),
           ],
         );
@@ -147,7 +157,8 @@ class _ResizableSplitRowState extends State<ResizableSplitRow> {
 }
 
 /// Interactive Resizable Card Container.
-/// Allows vertical height adjustment via a sleek bottom resize handle with drag feedback.
+/// Allows vertical height adjustment via a sleek bottom resize handle with drag feedback,
+/// size presets, collapsible folding ("collide"), and optional removal.
 class ResizableCard extends StatefulWidget {
   final Widget child;
   final double? initialHeight;
@@ -157,6 +168,12 @@ class ResizableCard extends StatefulWidget {
   final IconData? icon;
   final List<Widget>? headerActions;
   final EdgeInsetsGeometry padding;
+  final bool isCollapsible;
+  final bool initiallyCollapsed;
+  final bool? isCollapsed;
+  final ValueChanged<bool>? onCollapseChanged;
+  final VoidCallback? onRemove;
+  final Widget? collapsedSummary;
 
   const ResizableCard({
     super.key,
@@ -168,6 +185,12 @@ class ResizableCard extends StatefulWidget {
     this.icon,
     this.headerActions,
     this.padding = const EdgeInsets.all(20.0),
+    this.isCollapsible = true,
+    this.initiallyCollapsed = false,
+    this.isCollapsed,
+    this.onCollapseChanged,
+    this.onRemove,
+    this.collapsedSummary,
   });
 
   @override
@@ -178,11 +201,21 @@ class _ResizableCardState extends State<ResizableCard> {
   double? _height;
   bool _isHovering = false;
   bool _isDragging = false;
+  late bool _collapsed;
 
   @override
   void initState() {
     super.initState();
     _height = widget.initialHeight;
+    _collapsed = widget.isCollapsed ?? widget.initiallyCollapsed;
+  }
+
+  @override
+  void didUpdateWidget(covariant ResizableCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isCollapsed != null && widget.isCollapsed != oldWidget.isCollapsed) {
+      _collapsed = widget.isCollapsed!;
+    }
   }
 
   void _resetHeight() {
@@ -195,6 +228,14 @@ class _ResizableCardState extends State<ResizableCard> {
     setState(() {
       _height = height;
     });
+  }
+
+  void _toggleCollapse() {
+    final next = !_collapsed;
+    setState(() {
+      _collapsed = next;
+    });
+    widget.onCollapseChanged?.call(next);
   }
 
   @override
@@ -222,145 +263,200 @@ class _ResizableCardState extends State<ResizableCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Optional Header if title is provided
+          // Header if title is provided
           if (widget.title != null) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 20, right: 16, top: 16, bottom: 8),
-              child: Row(
-                children: [
-                  if (widget.icon != null) ...[
-                    Icon(widget.icon, color: colors.primary, size: 20),
-                    const SizedBox(width: 10),
-                  ],
-                  Expanded(
-                    child: Text(
-                      widget.title!,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: colors.textPrimary,
+            InkWell(
+              onTap: widget.isCollapsible ? _toggleCollapse : null,
+              borderRadius: BorderRadius.vertical(
+                top: const Radius.circular(14),
+                bottom: _collapsed ? const Radius.circular(14) : Radius.zero,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    if (widget.icon != null) ...[
+                      Icon(widget.icon, color: colors.primary, size: 20),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.title!,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: colors.textPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (_collapsed && widget.collapsedSummary != null) ...[
+                            const SizedBox(width: 10),
+                            Flexible(child: widget.collapsedSummary!),
+                          ],
+                        ],
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  if (widget.headerActions != null) ...widget.headerActions!,
-                  // Quick Size Presets Menu
-                  PopupMenuButton<double?>(
-                    tooltip: 'Widget Size Presets',
-                    icon: Icon(Icons.aspect_ratio, size: 16, color: colors.textSecondary),
-                    color: colors.surfaceCard,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      side: BorderSide(color: colors.border),
-                    ),
-                    onSelected: _setPreset,
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: null,
-                        child: Text('Auto Fit Content', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
-                      ),
-                      PopupMenuItem(
-                        value: 240.0,
-                        child: Text('Compact (240px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
-                      ),
-                      PopupMenuItem(
-                        value: 380.0,
-                        child: Text('Medium (380px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
-                      ),
-                      PopupMenuItem(
-                        value: 580.0,
-                        child: Text('Large (580px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
+                    if (!_collapsed && widget.headerActions != null) ...widget.headerActions!,
+                    if (!_collapsed) ...[
+                      // Quick Size Presets Menu
+                      PopupMenuButton<double?>(
+                        tooltip: 'Widget Size Presets',
+                        icon: Icon(Icons.aspect_ratio, size: 16, color: colors.textSecondary),
+                        color: colors.surfaceCard,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(color: colors.border),
+                        ),
+                        onSelected: _setPreset,
+                        itemBuilder: (ctx) => [
+                          PopupMenuItem(
+                            value: null,
+                            child: Text('Auto Fit Content', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
+                          ),
+                          PopupMenuItem(
+                            value: 240.0,
+                            child: Text('Compact (240px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
+                          ),
+                          PopupMenuItem(
+                            value: 380.0,
+                            child: Text('Medium (380px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
+                          ),
+                          PopupMenuItem(
+                            value: 580.0,
+                            child: Text('Large (580px)', style: TextStyle(color: colors.textPrimary, fontSize: 13)),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ),
-            ),
-            Divider(color: colors.border, height: 1),
-          ],
-
-          // Content Box (Scrollable if height is constrained)
-          Padding(
-            padding: widget.padding,
-            child: _height == null
-                ? widget.child
-                : SizedBox(
-                    height: _height,
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: widget.child,
-                    ),
-                  ),
-          ),
-
-          // Bottom Drag Resize Handle
-          MouseRegion(
-            cursor: SystemMouseCursors.resizeRow,
-            onEnter: (_) => setState(() => _isHovering = true),
-            onExit: (_) => setState(() => _isHovering = false),
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onDoubleTap: _resetHeight,
-              onVerticalDragStart: (_) {
-                setState(() {
-                  _isDragging = true;
-                  // If currently auto, initialize height to current rendered box size
-                  _height ??= widget.minHeight + 100.0;
-                });
-              },
-              onVerticalDragEnd: (_) => setState(() => _isDragging = false),
-              onVerticalDragUpdate: (details) {
-                setState(() {
-                  final cur = _height ?? (widget.minHeight + 100.0);
-                  final next = cur + details.delta.dy;
-                  _height = next.clamp(widget.minHeight, widget.maxHeight);
-                });
-              },
-              child: Tooltip(
-                message: _height != null
-                    ? 'Drag vertically to resize (${_height!.toInt()}px) • Double-click to reset'
-                    : 'Drag vertically to resize height • Double-click to reset',
-                waitDuration: const Duration(milliseconds: 300),
-                child: Container(
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: _isDragging || _isHovering
-                        ? colors.primary.withValues(alpha: 0.08)
-                        : Colors.transparent,
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: _isDragging || _isHovering ? 48 : 28,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: _isDragging
-                              ? colors.primary
-                              : (_isHovering ? colors.primary.withValues(alpha: 0.8) : colors.border),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      if (_isDragging && _height != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_height!.toInt()} px',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: colors.primary,
+                    if (widget.isCollapsible)
+                      Tooltip(
+                        message: _collapsed ? 'Expand section' : 'Collapse section (collide)',
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: AnimatedRotation(
+                            turns: _collapsed ? 0.0 : 0.5,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 20,
+                              color: colors.textSecondary,
+                            ),
                           ),
                         ),
-                      ],
+                      ),
+                    if (widget.onRemove != null) ...[
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: 'Hide from dashboard',
+                        child: InkWell(
+                          onTap: widget.onRemove,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.close,
+                              size: 16,
+                              color: colors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
+                  ],
+                ),
+              ),
+            ),
+            if (!_collapsed)
+              Divider(color: colors.border, height: 1),
+          ],
+
+          if (!_collapsed) ...[
+            // Content Box (Scrollable if height is constrained)
+            Padding(
+              padding: widget.padding,
+              child: _height == null
+                  ? widget.child
+                  : SizedBox(
+                      height: _height,
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: widget.child,
+                      ),
+                    ),
+            ),
+
+            // Bottom Drag Resize Handle
+            MouseRegion(
+              cursor: SystemMouseCursors.resizeRow,
+              onEnter: (_) => setState(() => _isHovering = true),
+              onExit: (_) => setState(() => _isHovering = false),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onDoubleTap: _resetHeight,
+                onVerticalDragStart: (_) {
+                  setState(() {
+                    _isDragging = true;
+                    _height ??= widget.minHeight + 100.0;
+                  });
+                },
+                onVerticalDragEnd: (_) => setState(() => _isDragging = false),
+                onVerticalDragUpdate: (details) {
+                  setState(() {
+                    final cur = _height ?? (widget.minHeight + 100.0);
+                    final next = cur + details.delta.dy;
+                    _height = next.clamp(widget.minHeight, widget.maxHeight);
+                  });
+                },
+                child: Tooltip(
+                  message: _height != null
+                      ? 'Drag vertically to resize (${_height!.toInt()}px) • Double-click to reset'
+                      : 'Drag vertically to resize height • Double-click to reset',
+                  waitDuration: const Duration(milliseconds: 300),
+                  child: Container(
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: _isDragging || _isHovering
+                          ? colors.primary.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: _isDragging || _isHovering ? 48 : 28,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: _isDragging
+                                ? colors.primary
+                                : (_isHovering ? colors.primary.withValues(alpha: 0.8) : colors.border),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        if (_isDragging && _height != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_height!.toInt()} px',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: colors.primary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

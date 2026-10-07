@@ -15,6 +15,77 @@ class DashboardView extends ConsumerStatefulWidget {
 class _DashboardViewState extends ConsumerState<DashboardView> {
   final Set<String> _expandedAppNames = {};
 
+  // Card visibility state (allow removing / hiding cards)
+  bool _showAppUsage = true;
+  bool _showLinkDetails = true;
+  bool _showHotspotClients = true;
+  bool _showNearbyWifi = true;
+
+  // Card collapsed state (allow colliding / folding cards)
+  // By default, secondary bottom cards start collapsed to eliminate clutter!
+  bool _collapseAppUsage = false;
+  bool _collapseLinkDetails = false;
+  bool _collapseHotspotClients = true;
+  bool _collapseNearbyWifi = true;
+
+  bool get _areAllCollapsed =>
+      _collapseAppUsage &&
+      _collapseLinkDetails &&
+      _collapseHotspotClients &&
+      _collapseNearbyWifi;
+
+  void _toggleAllCollapsed() {
+    final target = !_areAllCollapsed;
+    setState(() {
+      _collapseAppUsage = target;
+      _collapseLinkDetails = target;
+      _collapseHotspotClients = target;
+      _collapseNearbyWifi = target;
+    });
+  }
+
+  Widget _buildRestoreChip(String label, VoidCallback onRestore, NetraPalette colors) {
+    return InkWell(
+      onTap: onRestore,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: colors.primary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add, size: 12, color: colors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryPill(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
   String _formatSpeed(int bps) {
     if (bps < 1024) return '$bps B/s';
     if (bps < 1024 * 1024) return '${(bps / 1024).toStringAsFixed(1)} KB/s';
@@ -87,24 +158,93 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                 ),
               ),
               const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: () {
-                  ref.read(networkStateProvider.notifier).refreshScan();
-                  ref.read(trafficStateProvider.notifier).refreshTraffic();
-                },
-                icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Refresh Telemetry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.surfaceCard,
-                  foregroundColor: colors.primary,
-                  side: BorderSide(color: colors.border),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _toggleAllCollapsed,
+                    icon: Icon(
+                      _areAllCollapsed ? Icons.unfold_more : Icons.unfold_less,
+                      size: 16,
+                    ),
+                    label: Text(_areAllCollapsed ? 'Expand All' : 'Collapse Cards'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.textPrimary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ref.read(networkStateProvider.notifier).refreshScan();
+                      ref.read(trafficStateProvider.notifier).refreshTraffic();
+                    },
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Refresh Telemetry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.surfaceCard,
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
+          if (!_showAppUsage || !_showLinkDetails || !_showHotspotClients || !_showNearbyWifi) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.surfaceCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colors.border),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.visibility_off_outlined, size: 16, color: colors.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Hidden Cards:',
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (!_showAppUsage)
+                          _buildRestoreChip('App Usage', () => setState(() => _showAppUsage = true), colors),
+                        if (!_showLinkDetails)
+                          _buildRestoreChip('Link Details', () => setState(() => _showLinkDetails = true), colors),
+                        if (!_showHotspotClients)
+                          _buildRestoreChip('Hotspot Clients', () => setState(() => _showHotspotClients = true), colors),
+                        if (!_showNearbyWifi)
+                          _buildRestoreChip('Nearby Wi-Fi', () => setState(() => _showNearbyWifi = true), colors),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _showAppUsage = true;
+                        _showLinkDetails = true;
+                        _showHotspotClients = true;
+                        _showNearbyWifi = true;
+                      });
+                    },
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    child: const Text('Show All', style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
 
           // 1. Top Metrics Cards (Uniform Row Layout)
@@ -171,18 +311,26 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             minRatio: 0.30,
             maxRatio: 0.75,
             spacing: 20.0,
-            leftChild: ResizableCard(
-              title: 'Application Data Usage',
-              icon: Icons.data_usage,
-              initialHeight: 410.0,
-              minHeight: 200.0,
-              maxHeight: 900.0,
-              padding: const EdgeInsets.all(16),
-              headerActions: [
-                TextButton.icon(
-                  onPressed: () => ref.read(activeTabProvider.notifier).state = 4,
-                  icon: const Icon(Icons.arrow_forward, size: 14),
-                  label: const Text('View All in Traffic'),
+            leftChild: _showAppUsage
+                ? ResizableCard(
+                    title: 'Application Data Usage',
+                    icon: Icons.data_usage,
+                    initialHeight: 410.0,
+                    minHeight: 200.0,
+                    maxHeight: 900.0,
+                    padding: const EdgeInsets.all(16),
+                    isCollapsed: _collapseAppUsage,
+                    onCollapseChanged: (v) => setState(() => _collapseAppUsage = v),
+                    onRemove: () => setState(() => _showAppUsage = false),
+                    collapsedSummary: _buildSummaryPill(
+                      '${topApps.length} Apps Active',
+                      colors.primary,
+                    ),
+                    headerActions: [
+                      TextButton.icon(
+                        onPressed: () => ref.read(activeTabProvider.notifier).state = 4,
+                        icon: const Icon(Icons.arrow_forward, size: 14),
+                        label: const Text('View All in Traffic'),
                   style: TextButton.styleFrom(
                     foregroundColor: colors.primary,
                     visualDensity: VisualDensity.compact,
@@ -377,61 +525,71 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                         );
                       },
                     ),
-            ),
-            rightChild: ResizableCard(
-              title: 'Active Link Details',
-              icon: Icons.router,
-              initialHeight: 410.0,
-              minHeight: 200.0,
-              maxHeight: 900.0,
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _DetailRow(
-                    label: 'Interface',
-                    value: netState.primaryIface,
-                    colors: colors,
-                  ),
-                  _DetailRow(
-                    label: 'Connection State',
-                    value: netState.accessPoints.any((a) => a.isConnected) ? 'Connected' : 'Standby',
-                    colors: colors,
-                    valueColor: netState.accessPoints.any((a) => a.isConnected) ? colors.green : colors.amber,
-                  ),
-                  _DetailRow(
-                    label: 'Total Downloaded',
-                    value: _formatBytes(metrics?.rxBytes ?? 0),
-                    colors: colors,
-                  ),
-                  _DetailRow(
-                    label: 'Total Uploaded',
-                    value: _formatBytes(metrics?.txBytes ?? 0),
-                    colors: colors,
-                  ),
-                  _DetailRow(
-                    label: 'Hotspot Engine',
-                    value: hsState.isActive ? 'AP Active' : 'Offline',
-                    colors: colors,
-                    valueColor: hsState.isActive ? colors.amber : colors.textSecondary,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => ref.read(activeTabProvider.notifier).state = 1,
-                      icon: const Icon(Icons.wifi, size: 16),
-                      label: const Text('Manage Wi-Fi Networks'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colors.primary,
-                        side: BorderSide(color: colors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
+                  )
+                : null,
+            rightChild: _showLinkDetails
+                ? ResizableCard(
+                    title: 'Active Link Details',
+                    icon: Icons.router,
+                    initialHeight: 410.0,
+                    minHeight: 200.0,
+                    maxHeight: 900.0,
+                    padding: const EdgeInsets.all(16),
+                    isCollapsed: _collapseLinkDetails,
+                    onCollapseChanged: (v) => setState(() => _collapseLinkDetails = v),
+                    onRemove: () => setState(() => _showLinkDetails = false),
+                    collapsedSummary: _buildSummaryPill(
+                      netState.accessPoints.any((a) => a.isConnected) ? 'Connected' : 'Standby',
+                      netState.accessPoints.any((a) => a.isConnected) ? colors.green : colors.amber,
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _DetailRow(
+                          label: 'Interface',
+                          value: netState.primaryIface,
+                          colors: colors,
+                        ),
+                        _DetailRow(
+                          label: 'Connection State',
+                          value: netState.accessPoints.any((a) => a.isConnected) ? 'Connected' : 'Standby',
+                          colors: colors,
+                          valueColor: netState.accessPoints.any((a) => a.isConnected) ? colors.green : colors.amber,
+                        ),
+                        _DetailRow(
+                          label: 'Total Downloaded',
+                          value: _formatBytes(metrics?.rxBytes ?? 0),
+                          colors: colors,
+                        ),
+                        _DetailRow(
+                          label: 'Total Uploaded',
+                          value: _formatBytes(metrics?.txBytes ?? 0),
+                          colors: colors,
+                        ),
+                        _DetailRow(
+                          label: 'Hotspot Engine',
+                          value: hsState.isActive ? 'AP Active' : 'Offline',
+                          colors: colors,
+                          valueColor: hsState.isActive ? colors.amber : colors.textSecondary,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => ref.read(activeTabProvider.notifier).state = 1,
+                            icon: const Icon(Icons.wifi, size: 16),
+                            label: const Text('Manage Wi-Fi Networks'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: colors.primary,
+                              side: BorderSide(color: colors.border),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
           ),
 
           const SizedBox(height: 20),
@@ -442,138 +600,156 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             minRatio: 0.25,
             maxRatio: 0.75,
             spacing: 20.0,
-            leftChild: ResizableCard(
-              title: 'Hotspot Clients',
-              icon: Icons.devices,
-              initialHeight: 330.0,
-              minHeight: 180.0,
-              maxHeight: 800.0,
-              padding: const EdgeInsets.all(16),
-              headerActions: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: colors.border,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${hsState.clients.length} Active',
-                    style: TextStyle(fontSize: 11, color: colors.textSecondary),
-                  ),
-                ),
-              ],
-              child: hsState.clients.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.wifi_off, size: 32, color: colors.textMuted.withValues(alpha: 0.5)),
-                            const SizedBox(height: 8),
-                            Text(
-                              hsState.isActive
-                                  ? 'Hotspot is active • Waiting for clients'
-                                  : 'Hotspot is offline • Enable in Hotspot tab',
-                              style: TextStyle(color: colors.textMuted, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: hsState.clients.length,
-                      separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
-                      itemBuilder: (context, idx) {
-                        final c = hsState.clients[idx];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundColor: colors.primary.withValues(alpha: 0.15),
-                            child: Icon(Icons.phone_android, color: colors.primary, size: 16),
-                          ),
-                          title: Text(
-                            c.hostname ?? c.vendor ?? c.macAddress,
-                            style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          subtitle: Text(
-                            '${c.ipAddress} • ${c.macAddress}',
-                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
-                          ),
-                          trailing: Chip(
-                            label: Text(c.priority, style: const TextStyle(fontSize: 10)),
-                            backgroundColor: colors.surface,
-                            side: BorderSide(color: colors.border),
-                          ),
-                        );
-                      },
+            leftChild: _showHotspotClients
+                ? ResizableCard(
+                    title: 'Hotspot Clients',
+                    icon: Icons.devices,
+                    initialHeight: 330.0,
+                    minHeight: 180.0,
+                    maxHeight: 800.0,
+                    padding: const EdgeInsets.all(16),
+                    isCollapsed: _collapseHotspotClients,
+                    onCollapseChanged: (v) => setState(() => _collapseHotspotClients = v),
+                    onRemove: () => setState(() => _showHotspotClients = false),
+                    collapsedSummary: _buildSummaryPill(
+                      hsState.isActive ? '${hsState.clients.length} Active' : 'Offline',
+                      hsState.isActive ? colors.green : colors.textMuted,
                     ),
-            ),
-            rightChild: ResizableCard(
-              title: 'Nearby Wi-Fi Networks',
-              icon: Icons.wifi_find,
-              initialHeight: 330.0,
-              minHeight: 180.0,
-              maxHeight: 800.0,
-              padding: const EdgeInsets.all(16),
-              headerActions: [
-                Text(
-                  '${netState.accessPoints.length} Found',
-                  style: TextStyle(fontSize: 11, color: colors.textMuted),
-                ),
-              ],
-              child: netState.accessPoints.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
+                    headerActions: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: colors.border,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                         child: Text(
-                          'Scanning for wireless access points...',
-                          style: TextStyle(color: colors.textMuted, fontSize: 12),
+                          '${hsState.clients.length} Active',
+                          style: TextStyle(fontSize: 11, color: colors.textSecondary),
                         ),
                       ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: netState.accessPoints.take(4).length,
-                      separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
-                      itemBuilder: (context, idx) {
-                        final ap = netState.accessPoints[idx];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                          leading: Icon(
-                            ap.signalStrength > 60
-                                ? Icons.wifi
-                                : (ap.signalStrength > 30 ? Icons.wifi_2_bar : Icons.wifi_1_bar),
-                            color: ap.isConnected ? colors.green : colors.textSecondary,
-                            size: 18,
-                          ),
-                          title: Text(
-                            ap.ssid,
-                            style: TextStyle(
-                              color: ap.isConnected ? colors.green : colors.textPrimary,
-                              fontWeight: ap.isConnected ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 13,
+                    ],
+                    child: hsState.clients.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Column(
+                                children: [
+                                  Icon(Icons.wifi_off, size: 32, color: colors.textMuted.withValues(alpha: 0.5)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    hsState.isActive
+                                        ? 'Hotspot is active • Waiting for clients'
+                                        : 'Hotspot is offline • Enable in Hotspot tab',
+                                    style: TextStyle(color: colors.textMuted, fontSize: 12),
+                                  ),
+                                ],
+                              ),
                             ),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: hsState.clients.length,
+                            separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
+                            itemBuilder: (context, idx) {
+                              final c = hsState.clients[idx];
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: CircleAvatar(
+                                  backgroundColor: colors.primary.withValues(alpha: 0.15),
+                                  child: Icon(Icons.phone_android, color: colors.primary, size: 16),
+                                ),
+                                title: Text(
+                                  c.hostname ?? c.vendor ?? c.macAddress,
+                                  style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                subtitle: Text(
+                                  '${c.ipAddress} • ${c.macAddress}',
+                                  style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                                ),
+                                trailing: Chip(
+                                  label: Text(c.priority, style: const TextStyle(fontSize: 10)),
+                                  backgroundColor: colors.surface,
+                                  side: BorderSide(color: colors.border),
+                                ),
+                              );
+                            },
                           ),
-                          subtitle: Text(
-                            '${ap.band} • ${ap.security}',
-                            style: TextStyle(color: colors.textMuted, fontSize: 11),
-                          ),
-                          trailing: Text(
-                            '${ap.signalStrength}%',
-                            style: TextStyle(
-                              color: ap.isConnected ? colors.green : colors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        );
-                      },
+                  )
+                : null,
+            rightChild: _showNearbyWifi
+                ? ResizableCard(
+                    title: 'Nearby Wi-Fi Networks',
+                    icon: Icons.wifi_find,
+                    initialHeight: 330.0,
+                    minHeight: 180.0,
+                    maxHeight: 800.0,
+                    padding: const EdgeInsets.all(16),
+                    isCollapsed: _collapseNearbyWifi,
+                    onCollapseChanged: (v) => setState(() => _collapseNearbyWifi = v),
+                    onRemove: () => setState(() => _showNearbyWifi = false),
+                    collapsedSummary: _buildSummaryPill(
+                      '${netState.accessPoints.length} Found',
+                      colors.secondary,
                     ),
-            ),
+                    headerActions: [
+                      Text(
+                        '${netState.accessPoints.length} Found',
+                        style: TextStyle(fontSize: 11, color: colors.textMuted),
+                      ),
+                    ],
+                    child: netState.accessPoints.isEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(
+                                'Scanning for wireless access points...',
+                                style: TextStyle(color: colors.textMuted, fontSize: 12),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: netState.accessPoints.take(4).length,
+                            separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
+                            itemBuilder: (context, idx) {
+                              final ap = netState.accessPoints[idx];
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                leading: Icon(
+                                  ap.signalStrength > 60
+                                      ? Icons.wifi
+                                      : (ap.signalStrength > 30 ? Icons.wifi_2_bar : Icons.wifi_1_bar),
+                                  color: ap.isConnected ? colors.green : colors.textSecondary,
+                                  size: 18,
+                                ),
+                                title: Text(
+                                  ap.ssid,
+                                  style: TextStyle(
+                                    color: ap.isConnected ? colors.green : colors.textPrimary,
+                                    fontWeight: ap.isConnected ? FontWeight.bold : FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${ap.band} • ${ap.security}',
+                                  style: TextStyle(color: colors.textMuted, fontSize: 11),
+                                ),
+                                trailing: Text(
+                                  '${ap.signalStrength}%',
+                                  style: TextStyle(
+                                    color: ap.isConnected ? colors.green : colors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  )
+                : null,
           ),
         ],
       ),

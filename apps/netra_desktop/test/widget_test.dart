@@ -44,4 +44,53 @@ void main() {
 
     expect(find.byIcon(Icons.light_mode), findsOneWidget);
   });
+
+  testWidgets('Dashboard cards collapse and remove/restore tests', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: NetraApp(),
+      ),
+    );
+
+    // Verify Collapse Cards button exists
+    final collapseBtnFinder = find.text('Collapse Cards');
+    expect(collapseBtnFinder, findsOneWidget);
+
+    // Tap Collapse Cards to collapse all cards ("collide")
+    await tester.tap(collapseBtnFinder);
+    await tester.pumpAndSettle();
+
+    // Now button should say 'Expand All'
+    expect(find.text('Expand All'), findsOneWidget);
+
+    // Tap Expand All to re-expand all cards
+    await tester.tap(find.text('Expand All'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Collapse Cards'), findsOneWidget);
+
+    // Verify close/hide icon buttons exist for cards
+    final closeIcons = find.byIcon(Icons.close);
+    expect(closeIcons, findsWidgets);
+
+    // Tap the first close icon to hide/remove a card
+    await tester.tap(closeIcons.first);
+    await tester.pumpAndSettle();
+
+    // Verify Hidden Cards bar appears with Show All button
+    expect(find.text('Hidden Cards:'), findsOneWidget);
+    expect(find.text('Show All'), findsOneWidget);
+
+    // Tap Show All to restore all hidden cards
+    await tester.tap(find.text('Show All'));
+    await tester.pumpAndSettle();
+
+    // Hidden Cards bar should disappear
+    expect(find.text('Hidden Cards:'), findsNothing);
+  });
 }
