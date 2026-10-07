@@ -68,7 +68,19 @@ class NetworkNotifier extends StateNotifier<NetworkState> {
     await updateMetrics();
 
     _telemetryTimer?.cancel();
-    _telemetryTimer = Timer.periodic(const Duration(seconds: 1), (_) => updateMetrics());
+    int ticks = 0;
+    _telemetryTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
+      await updateMetrics();
+      ticks++;
+      if (ticks % 3 == 0) {
+        try {
+          final aps = await _service.getAccessPoints();
+          if (aps.isNotEmpty) {
+            state = state.copyWith(accessPoints: aps);
+          }
+        } catch (_) {}
+      }
+    });
   }
 
   Future<void> refreshScan() async {

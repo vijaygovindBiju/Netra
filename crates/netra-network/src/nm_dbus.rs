@@ -91,9 +91,84 @@ impl NetworkManagerClient {
 
         // Retrieve the currently active AP path if connected
         let active_ap_path: Option<OwnedObjectPath> = wireless_proxy
-            .get_property("ActiveAccessPoint")
+            .get_property::<OwnedObjectPath>("ActiveAccessPoint")
             .await
-            .ok();
+            .ok()
+            .filter(|p| p.as_str() != "/");
+
+        let mut active_ssid: Option<String> = None;
+        let mut active_ap_info: Option<AccessPointInfo> = None;
+
+        // If we have an active AP path, retrieve its details directly
+        if let Some(ref ap_p_path) = active_ap_path {
+            if let Ok(ap_proxy) = zbus::Proxy::new(
+                &self.connection,
+                NM_SERVICE,
+                ap_p_path.as_str(),
+                NM_AP_IFACE,
+            ).await {
+                let ssid_bytes: Vec<u8> = ap_proxy.get_property("Ssid").await.unwrap_or_default();
+                let ssid = String::from_utf8_lossy(&ssid_bytes).to_string();
+                if !ssid.trim().is_empty() {
+                    active_ssid = Some(ssid.clone());
+                    let bssid: String = ap_proxy.get_property("HwAddress").await.unwrap_or_default();
+                    let strength: u8 = ap_proxy.get_property("Strength").await.unwrap_or(0);
+                    let frequency: u32 = ap_proxy.get_property("Frequency").await.unwrap_or(2412);
+                    let wpa_flags: u32 = ap_proxy.get_property("WpaFlags").await.unwrap_or(0);
+                    let rsn_flags: u32 = ap_proxy.get_property("RsnFlags").await.unwrap_or(0);
+
+                    let security = if rsn_flags != 0 {
+                        if rsn_flags & 0x400 != 0 {
+                            SecurityType::Wpa3Sae
+                        } else {
+                            SecurityType::Wpa2Psk
+                        }
+                    } else if wpa_flags != 0 {
+                        SecurityType::WpaPsk
+                    } else {
+                        SecurityType::Open
+                    };
+
+                    let band = WifiBand::from_frequency(frequency);
+                    active_ap_info = Some(AccessPointInfo {
+                        ssid,
+                        bssid,
+                        signal_strength: strength,
+                        frequency_mhz: frequency,
+                        band,
+                        security,
+                        is_connected: true,
+                    });
+                }
+            }
+        }
+
+        // Secondary check: verify ActiveConnection on the device interface if SSID not yet found
+        if active_ssid.is_none() {
+            if let Ok(dev_proxy) = zbus::Proxy::new(
+                &self.connection,
+                NM_SERVICE,
+                dev_path.as_str(),
+                NM_DEVICE_IFACE,
+            ).await {
+                if let Ok(active_conn_path) = dev_proxy.get_property::<OwnedObjectPath>("ActiveConnection").await {
+                    if active_conn_path.as_str() != "/" {
+                        if let Ok(conn_proxy) = zbus::Proxy::new(
+                            &self.connection,
+                            NM_SERVICE,
+                            active_conn_path.as_str(),
+                            "org.freedesktop.NetworkManager.Connection.Active",
+                        ).await {
+                            if let Ok(id) = conn_proxy.get_property::<String>("Id").await {
+                                if !id.trim().is_empty() {
+                                    active_ssid = Some(id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let ap_paths: Vec<OwnedObjectPath> = wireless_proxy
             .call("GetAllAccessPoints", &())
@@ -139,7 +214,8 @@ impl NetworkManagerClient {
                 SecurityType::Open
             };
 
-            let is_connected = active_ap_path.as_ref().map_or(false, |active| active == &ap_path);
+            let is_connected = active_ap_path.as_ref().map_or(false, |active| active == &ap_path)
+                || active_ssid.as_ref().map_or(false, |act_s| act_s == &ssid);
             let band = WifiBand::from_frequency(frequency);
 
             ap_list.push(AccessPointInfo {
@@ -153,25 +229,7 @@ impl NetworkManagerClient {
             });
         }
 
-        // Sort access points by signal strength descending
-        ap_list.sort_by(|a, b| b.signal_strength.cmp(&a.signal_strength));
-
-        // Deduplicate SSIDs keeping strongest signal
-        let mut unique_aps: HashMap<String, AccessPointInfo> = HashMap::new();
-        for ap in ap_list {
-            unique_aps.entry(ap.ssid.clone())
-                .and_modify(|existing| {
-                    if ap.signal_strength > existing.signal_strength {
-                        *existing = ap.clone();
-                    }
-                })
-                .or_insert(ap);
-        }
-
-        let mut final_list: Vec<AccessPointInfo> = unique_aps.into_values().collect();
-        final_list.sort_by(|a, b| b.signal_strength.cmp(&a.signal_strength));
-
-        Ok(final_list)
+        Ok(deduplicate_and_sort_aps(ap_list, active_ap_info, active_ssid))
     }
 
     /// Connects to a Wi-Fi network with given SSID and Passphrase
@@ -351,3 +409,133 @@ impl NetworkManagerClient {
         self.active_hotspot_path.is_some()
     }
 }
+
+/// Deduplicates access points by SSID, ensuring connected access points are never overshadowed
+/// by disconnected repeaters or access points with different signal strengths.
+pub fn deduplicate_and_sort_aps(
+    ap_list: Vec<AccessPointInfo>,
+    active_ap_info: Option<AccessPointInfo>,
+    active_ssid: Option<String>,
+) -> Vec<AccessPointInfo> {
+    let mut unique_aps: HashMap<String, AccessPointInfo> = HashMap::new();
+
+    for ap in ap_list {
+        unique_aps
+            .entry(ap.ssid.clone())
+            .and_modify(|existing| {
+                if ap.is_connected && !existing.is_connected {
+                    // Current AP is connected, existing was not: replace with connected AP
+                    *existing = ap.clone();
+                } else if !ap.is_connected && existing.is_connected {
+                    // Existing is connected, current is not: preserve existing connected AP
+                } else if ap.signal_strength > existing.signal_strength {
+                    // Both connected or both disconnected: keep higher signal strength
+                    let was_connected = existing.is_connected || ap.is_connected;
+                    *existing = ap.clone();
+                    existing.is_connected = was_connected;
+                }
+            })
+            .or_insert(ap);
+    }
+
+    // Ensure active AP info is merged if discovered directly from ActiveAccessPoint
+    if let Some(active) = active_ap_info {
+        unique_aps
+            .entry(active.ssid.clone())
+            .and_modify(|existing| {
+                *existing = active.clone();
+            })
+            .or_insert(active);
+    }
+
+    // Ensure active SSID is marked as connected
+    if let Some(ref act_ssid) = active_ssid {
+        if let Some(existing) = unique_aps.get_mut(act_ssid) {
+            existing.is_connected = true;
+        }
+    }
+
+    let mut final_list: Vec<AccessPointInfo> = unique_aps.into_values().collect();
+    // Sort connected APs first, then sort by signal strength descending
+    final_list.sort_by(|a, b| {
+        b.is_connected
+            .cmp(&a.is_connected)
+            .then_with(|| b.signal_strength.cmp(&a.signal_strength))
+    });
+
+    final_list
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deduplicate_preserves_connected_ap_even_with_lower_strength() {
+        let ap_disconnected = AccessPointInfo {
+            ssid: "Hostel_Guest".to_string(),
+            bssid: "AC:71:2E:A8:C2:00".to_string(),
+            signal_strength: 60,
+            frequency_mhz: 2412,
+            band: WifiBand::Band24GHz,
+            security: SecurityType::Open,
+            is_connected: false,
+        };
+        let ap_connected = AccessPointInfo {
+            ssid: "Hostel_Guest".to_string(),
+            bssid: "AC:71:2E:A8:C2:08".to_string(),
+            signal_strength: 55,
+            frequency_mhz: 5500,
+            band: WifiBand::Band5GHz,
+            security: SecurityType::Open,
+            is_connected: true,
+        };
+
+        // Case 1: Disconnected AP comes first in list
+        let list1 = vec![ap_disconnected.clone(), ap_connected.clone()];
+        let res1 = deduplicate_and_sort_aps(list1, Some(ap_connected.clone()), Some("Hostel_Guest".into()));
+        assert_eq!(res1.len(), 1);
+        assert!(res1[0].is_connected);
+        assert_eq!(res1[0].ssid, "Hostel_Guest");
+        assert_eq!(res1[0].bssid, "AC:71:2E:A8:C2:08");
+
+        // Case 2: Connected AP comes first in list
+        let list2 = vec![ap_connected.clone(), ap_disconnected.clone()];
+        let res2 = deduplicate_and_sort_aps(list2, Some(ap_connected.clone()), Some("Hostel_Guest".into()));
+        assert_eq!(res2.len(), 1);
+        assert!(res2[0].is_connected);
+        assert_eq!(res2[0].ssid, "Hostel_Guest");
+        assert_eq!(res2[0].bssid, "AC:71:2E:A8:C2:08");
+    }
+
+    #[test]
+    fn test_connected_ap_sorted_first() {
+        let ap_other = AccessPointInfo {
+            ssid: "Stronger_Network".to_string(),
+            bssid: "11:22:33:44:55:66".to_string(),
+            signal_strength: 90,
+            frequency_mhz: 2412,
+            band: WifiBand::Band24GHz,
+            security: SecurityType::Wpa2Psk,
+            is_connected: false,
+        };
+        let ap_connected = AccessPointInfo {
+            ssid: "Hostel_Guest".to_string(),
+            bssid: "AC:71:2E:A8:C2:08".to_string(),
+            signal_strength: 55,
+            frequency_mhz: 5500,
+            band: WifiBand::Band5GHz,
+            security: SecurityType::Open,
+            is_connected: true,
+        };
+
+        let list = vec![ap_other.clone(), ap_connected.clone()];
+        let res = deduplicate_and_sort_aps(list, Some(ap_connected.clone()), Some("Hostel_Guest".into()));
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].ssid, "Hostel_Guest");
+        assert!(res[0].is_connected);
+        assert_eq!(res[1].ssid, "Stronger_Network");
+        assert!(!res[1].is_connected);
+    }
+}
+
