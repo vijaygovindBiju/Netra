@@ -38,32 +38,33 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = NetraColors.of(context);
     final hsState = ref.watch(hotspotStateProvider);
     final notifier = ref.read(hotspotStateProvider.notifier);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Smart Hotspot',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: NetraColors.textPrimary,
+                      color: colors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'One-click AP tethering, connected device tracking, and QoS control',
-                    style: TextStyle(color: NetraColors.textSecondary, fontSize: 14),
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -73,60 +74,53 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Icon(
                         hsState.isActive ? Icons.stop : Icons.play_arrow,
-                        size: 20,
-                        color: hsState.isActive ? Colors.white : Colors.black,
+                        size: 18,
+                        color: Colors.white,
                       ),
                 label: Text(
                   hsState.isActive ? 'Stop Hotspot' : 'Start Hotspot',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: hsState.isActive ? Colors.white : Colors.black,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: hsState.isActive ? NetraColors.red : NetraColors.cyan,
-                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: hsState.isActive ? colors.red : colors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // Hotspot Status Card
           Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: NetraColors.surfaceCard,
-              borderRadius: BorderRadius.circular(16),
+              color: colors.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: hsState.isActive ? NetraColors.cyan.withOpacity(0.5) : NetraColors.border,
+                color: hsState.isActive ? colors.primary.withValues(alpha: 0.5) : colors.border,
               ),
-              boxShadow: hsState.isActive
-                  ? [
-                      BoxInsets.cyanGlow,
-                    ]
-                  : [],
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: (hsState.isActive ? NetraColors.cyan : NetraColors.textMuted).withOpacity(0.15),
+                    color: (hsState.isActive ? colors.primary : colors.textMuted).withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.local_fire_department,
-                    color: hsState.isActive ? NetraColors.cyan : NetraColors.textMuted,
-                    size: 32,
+                    color: hsState.isActive ? colors.primary : colors.textMuted,
+                    size: 28,
                   ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,10 +130,10 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                           Text(
                             hsState.isActive ? 'HOTSPOT IS BROADCASTING' : 'HOTSPOT IS OFFLINE',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
-                              color: hsState.isActive ? NetraColors.cyan : NetraColors.textMuted,
+                              letterSpacing: 1.0,
+                              color: hsState.isActive ? colors.primary : colors.textMuted,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -147,26 +141,26 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: NetraColors.green.withOpacity(0.2),
+                                color: colors.green.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
                                 '${hsState.config.band} BAND',
-                                style: const TextStyle(
-                                  color: NetraColors.green,
-                                  fontSize: 11,
+                                style: TextStyle(
+                                  color: colors.green,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         hsState.isActive
                             ? 'Broadcasting "${hsState.config.ssid}" • ${hsState.clients.length} device(s) connected'
                             : 'Configure SSID and security below, then start your hotspot',
-                        style: const TextStyle(color: NetraColors.textSecondary, fontSize: 13),
+                        style: TextStyle(color: colors.textSecondary, fontSize: 12),
                       ),
                     ],
                   ),
@@ -174,7 +168,7 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // Configuration and Connected Clients Row
           Row(
@@ -184,88 +178,91 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
               Expanded(
                 flex: 4,
                 child: Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: NetraColors.surfaceCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: NetraColors.border),
+                    color: colors.surfaceCard,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(Icons.tune, color: NetraColors.cyan, size: 20),
-                          SizedBox(width: 10),
+                          Icon(Icons.tune, color: colors.primary, size: 20),
+                          const SizedBox(width: 10),
                           Text(
                             'Configuration',
                             style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: NetraColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: colors.textPrimary,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
                       // SSID Field
-                      const Text('Network Name (SSID)', style: TextStyle(color: NetraColors.textSecondary, fontSize: 13)),
-                      const SizedBox(height: 8),
+                      Text('Network Name (SSID)', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: _ssidController,
                         enabled: !hsState.isActive,
-                        style: const TextStyle(color: NetraColors.textPrimary),
+                        style: TextStyle(color: colors.textPrimary, fontSize: 13),
                         onChanged: (val) => notifier.updateConfig(ssid: val),
                         decoration: InputDecoration(
                           filled: true,
-                          fillColor: NetraColors.surface,
+                          fillColor: colors.surface,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: NetraColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: colors.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: NetraColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: colors.border),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
 
                       // Password Field
-                      const Text('WPA2/WPA3 Passphrase', style: TextStyle(color: NetraColors.textSecondary, fontSize: 13)),
-                      const SizedBox(height: 8),
+                      Text('WPA2/WPA3 Passphrase', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: _passwordController,
                         enabled: !hsState.isActive,
                         obscureText: _obscurePassword,
-                        style: const TextStyle(color: NetraColors.textPrimary),
+                        style: TextStyle(color: colors.textPrimary, fontSize: 13),
                         onChanged: (val) => notifier.updateConfig(passphrase: val),
                         decoration: InputDecoration(
                           filled: true,
-                          fillColor: NetraColors.surface,
+                          fillColor: colors.surface,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                              color: NetraColors.textSecondary,
+                              color: colors.textSecondary,
+                              size: 18,
                             ),
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                           ),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: NetraColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: colors.border),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: NetraColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: colors.border),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
 
                       // Frequency Band Selection
-                      const Text('Frequency Band', style: TextStyle(color: NetraColors.textSecondary, fontSize: 13)),
-                      const SizedBox(height: 8),
+                      Text('Frequency Band', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                      const SizedBox(height: 6),
                       Row(
                         children: [
                           Expanded(
@@ -274,6 +271,7 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                               isSelected: hsState.config.band == '2.4GHz',
                               enabled: !hsState.isActive,
                               onTap: () => notifier.updateConfig(band: '2.4GHz'),
+                              colors: colors,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -283,6 +281,7 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                               isSelected: hsState.config.band == '5GHz',
                               enabled: !hsState.isActive,
                               onTap: () => notifier.updateConfig(band: '5GHz'),
+                              colors: colors,
                             ),
                           ),
                         ],
@@ -297,11 +296,11 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
               Expanded(
                 flex: 6,
                 child: Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: NetraColors.surfaceCard,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: NetraColors.border),
+                    color: colors.surfaceCard,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,35 +308,35 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.devices, color: NetraColors.violet, size: 20),
-                              SizedBox(width: 10),
+                              Icon(Icons.devices, color: colors.secondary, size: 20),
+                              const SizedBox(width: 10),
                               Text(
                                 'Connected Devices & QoS',
                                 style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: NetraColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: colors.textPrimary,
                                 ),
                               ),
                             ],
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                             decoration: BoxDecoration(
-                              color: NetraColors.surface,
+                              color: colors.surface,
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: NetraColors.border),
+                              border: Border.all(color: colors.border),
                             ),
                             child: Text(
                               '${hsState.clients.length} Devices',
-                              style: const TextStyle(fontSize: 12, color: NetraColors.cyan),
+                              style: TextStyle(fontSize: 11, color: colors.primary),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
                       if (hsState.clients.isEmpty)
                         Padding(
@@ -345,13 +344,13 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                           child: Center(
                             child: Column(
                               children: [
-                                Icon(Icons.wifi_tethering_off, size: 40, color: NetraColors.textMuted.withOpacity(0.4)),
-                                const SizedBox(height: 12),
+                                Icon(Icons.wifi_tethering_off, size: 36, color: colors.textMuted.withValues(alpha: 0.4)),
+                                const SizedBox(height: 10),
                                 Text(
                                   hsState.isActive
                                       ? 'Waiting for devices to connect...'
                                       : 'Start hotspot to monitor connected clients',
-                                  style: const TextStyle(color: NetraColors.textMuted),
+                                  style: TextStyle(color: colors.textMuted, fontSize: 12),
                                 ),
                               ],
                             ),
@@ -362,51 +361,52 @@ class _HotspotViewState extends ConsumerState<HotspotView> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: hsState.clients.length,
-                          separatorBuilder: (_, __) => const Divider(color: NetraColors.border),
+                          separatorBuilder: (_, __) => Divider(color: colors.border, height: 12),
                           itemBuilder: (context, idx) {
                             final client = hsState.clients[idx];
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
                                 children: [
                                   CircleAvatar(
-                                    backgroundColor: NetraColors.cyan.withOpacity(0.12),
-                                    child: const Icon(Icons.phone_android, color: NetraColors.cyan, size: 18),
+                                    radius: 16,
+                                    backgroundColor: colors.primary.withValues(alpha: 0.12),
+                                    child: Icon(Icons.phone_android, color: colors.primary, size: 16),
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           client.hostname ?? client.vendor ?? 'Device (${client.macAddress})',
-                                          style: const TextStyle(
-                                            color: NetraColors.textPrimary,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
+                                          style: TextStyle(
+                                            color: colors.textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           '${client.ipAddress} • ${client.macAddress} • ${_formatDuration(client.connectedDurationSecs)}',
-                                          style: const TextStyle(color: NetraColors.textSecondary, fontSize: 11),
+                                          style: TextStyle(color: colors.textSecondary, fontSize: 11),
                                         ),
                                       ],
                                     ),
                                   ),
                                   // QoS Priority Dropdown
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
                                     decoration: BoxDecoration(
-                                      color: NetraColors.surface,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: NetraColors.border),
+                                      color: colors.surface,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: colors.border),
                                     ),
                                     child: DropdownButton<String>(
                                       value: client.priority,
-                                      dropdownColor: NetraColors.surfaceCard,
+                                      dropdownColor: colors.surfaceCard,
                                       underline: const SizedBox(),
-                                      style: const TextStyle(color: NetraColors.textPrimary, fontSize: 12),
+                                      style: TextStyle(color: colors.textPrimary, fontSize: 11),
                                       items: const [
                                         DropdownMenuItem(value: 'High', child: Text('High Priority')),
                                         DropdownMenuItem(value: 'Medium', child: Text('Medium Priority')),
@@ -441,26 +441,28 @@ class _BandSelectorButton extends StatelessWidget {
   final bool isSelected;
   final bool enabled;
   final VoidCallback onTap;
+  final NetraPalette colors;
 
   const _BandSelectorButton({
     required this.label,
     required this.isSelected,
     required this.enabled,
     required this.onTap,
+    required this.colors,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? NetraColors.cyan.withOpacity(0.15) : NetraColors.surface,
-          borderRadius: BorderRadius.circular(10),
+          color: isSelected ? colors.primary.withValues(alpha: 0.15) : colors.surface,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? NetraColors.cyan : NetraColors.border,
+            color: isSelected ? colors.primary : colors.border,
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -468,20 +470,12 @@ class _BandSelectorButton extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? NetraColors.cyan : NetraColors.textSecondary,
-            fontSize: 12,
+            color: isSelected ? colors.primary : colors.textSecondary,
+            fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),
     );
   }
-}
-
-class BoxInsets {
-  static final cyanGlow = BoxShadow(
-    color: NetraColors.cyan.withOpacity(0.15),
-    blurRadius: 18,
-    spreadRadius: 2,
-  );
 }

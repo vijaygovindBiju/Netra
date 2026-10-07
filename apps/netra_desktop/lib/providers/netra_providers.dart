@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/audio_models.dart';
 import '../models/bluetooth_models.dart';
@@ -6,6 +7,10 @@ import '../models/hotspot_models.dart';
 import '../models/network_models.dart';
 import '../models/traffic_models.dart';
 import '../services/netra_dbus_service.dart';
+
+// UI Navigation and Theme Providers
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.dark);
+final activeTabProvider = StateProvider<int>((ref) => 0);
 
 final netraServiceProvider = Provider<NetraDbusService>((ref) {
   final service = NetraDbusService();

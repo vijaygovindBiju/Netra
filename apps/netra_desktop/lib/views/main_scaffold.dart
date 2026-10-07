@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
 import 'audio_view.dart';
 import 'bluetooth_view.dart';
@@ -8,15 +9,8 @@ import 'hotspot_view.dart';
 import 'traffic_view.dart';
 import 'wifi_view.dart';
 
-class MainScaffold extends ConsumerStatefulWidget {
+class MainScaffold extends ConsumerWidget {
   const MainScaffold({super.key});
-
-  @override
-  ConsumerState<MainScaffold> createState() => _MainScaffoldState();
-}
-
-class _MainScaffoldState extends ConsumerState<MainScaffold> {
-  int _selectedIndex = 0;
 
   final List<Widget> _views = const [
     DashboardView(),
@@ -28,70 +22,109 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selectedIndex = ref.watch(activeTabProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final colors = NetraColors.of(context);
+
     return Scaffold(
-      backgroundColor: NetraColors.background,
+      backgroundColor: colors.background,
       body: Row(
         children: [
           // Left Sidebar
           Container(
-            width: 260,
-            decoration: const BoxDecoration(
-              color: NetraColors.surface,
-              border: Border(right: BorderSide(color: NetraColors.border)),
+            width: 250,
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(right: BorderSide(color: colors.border)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // App Branding
+                // App Branding with Theme Switcher
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [NetraColors.cyan, NetraColors.violet],
+                          gradient: LinearGradient(
+                            colors: [colors.primary, colors.secondary],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.remove_red_eye, color: Colors.black, size: 22),
+                        child: const Icon(Icons.remove_red_eye, color: Colors.white, size: 20),
                       ),
-                      const SizedBox(width: 14),
-                      const Expanded(
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'NETRA',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 2,
-                                color: NetraColors.textPrimary,
+                                color: colors.textPrimary,
                               ),
                             ),
                             Text(
                               'Control Center',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: NetraColors.textMuted,
+                                color: colors.textMuted,
                                 letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      // Light / Dark Theme Mode Toggle
+                      Tooltip(
+                        message: themeMode == ThemeMode.dark
+                            ? 'Switch to Light Theme'
+                            : 'Switch to Dark Theme',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              ref.read(themeModeProvider.notifier).state =
+                                  themeMode == ThemeMode.dark
+                                      ? ThemeMode.light
+                                      : ThemeMode.dark;
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: colors.surfaceCard,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: colors.border),
+                              ),
+                              child: Icon(
+                                themeMode == ThemeMode.dark
+                                    ? Icons.light_mode
+                                    : Icons.dark_mode,
+                                size: 16,
+                                color: themeMode == ThemeMode.dark
+                                    ? colors.amber
+                                    : colors.secondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const Divider(color: NetraColors.border, height: 1),
-                const SizedBox(height: 16),
+                Divider(color: colors.border, height: 1),
+                const SizedBox(height: 12),
 
-                // Navigation Items (Scrollable)
+                // Navigation Items
                 Expanded(
                   child: SingleChildScrollView(
                     child: Column(
@@ -101,43 +134,43 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                           icon: Icons.dashboard_outlined,
                           activeIcon: Icons.dashboard,
                           label: 'Dashboard',
-                          isSelected: _selectedIndex == 0,
-                          onTap: () => setState(() => _selectedIndex = 0),
+                          isSelected: selectedIndex == 0,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 0,
                         ),
                         _SidebarItem(
                           icon: Icons.wifi_outlined,
                           activeIcon: Icons.wifi,
                           label: 'Wi-Fi Networks',
-                          isSelected: _selectedIndex == 1,
-                          onTap: () => setState(() => _selectedIndex = 1),
+                          isSelected: selectedIndex == 1,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 1,
                         ),
                         _SidebarItem(
                           icon: Icons.local_fire_department_outlined,
                           activeIcon: Icons.local_fire_department,
                           label: 'Smart Hotspot',
-                          isSelected: _selectedIndex == 2,
-                          onTap: () => setState(() => _selectedIndex = 2),
+                          isSelected: selectedIndex == 2,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 2,
                         ),
                         _SidebarItem(
                           icon: Icons.bluetooth_outlined,
                           activeIcon: Icons.bluetooth,
                           label: 'Bluetooth Center',
-                          isSelected: _selectedIndex == 3,
-                          onTap: () => setState(() => _selectedIndex = 3),
+                          isSelected: selectedIndex == 3,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 3,
                         ),
                         _SidebarItem(
                           icon: Icons.data_usage_outlined,
                           activeIcon: Icons.data_usage,
                           label: 'Traffic & Sockets',
-                          isSelected: _selectedIndex == 4,
-                          onTap: () => setState(() => _selectedIndex = 4),
+                          isSelected: selectedIndex == 4,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 4,
                         ),
                         _SidebarItem(
                           icon: Icons.headphones_outlined,
                           activeIcon: Icons.headphones,
                           label: 'PipeWire Audio',
-                          isSelected: _selectedIndex == 5,
-                          onTap: () => setState(() => _selectedIndex = 5),
+                          isSelected: selectedIndex == 5,
+                          onTap: () => ref.read(activeTabProvider.notifier).state = 5,
                         ),
                       ],
                     ),
@@ -146,25 +179,25 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
                 // Daemon Status Footer
                 Container(
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(14),
+                  margin: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: NetraColors.surfaceCard,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: NetraColors.border),
+                    color: colors.surfaceCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colors.border),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: NetraColors.green,
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: colors.green,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -173,19 +206,19 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: NetraColors.textPrimary,
+                                color: colors.textPrimary,
                               ),
                             ),
                             Text(
                               'org.netra.Control',
-                              style: TextStyle(fontSize: 10, color: NetraColors.textMuted),
+                              style: TextStyle(fontSize: 10, color: colors.textMuted),
                             ),
                           ],
                         ),
                       ),
                       Text(
                         'v1.0.0',
-                        style: TextStyle(fontSize: 10, color: NetraColors.cyan.withOpacity(0.8)),
+                        style: TextStyle(fontSize: 10, color: colors.primary),
                       ),
                     ],
                   ),
@@ -196,7 +229,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
           // Main View Content
           Expanded(
-            child: _views[_selectedIndex],
+            child: _views[selectedIndex],
           ),
         ],
       ),
@@ -221,39 +254,48 @@ class _SidebarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = NetraColors.of(context);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          decoration: BoxDecoration(
-            color: isSelected ? NetraColors.cyan.withOpacity(0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? NetraColors.cyan.withOpacity(0.3) : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                isSelected ? activeIcon : icon,
-                color: isSelected ? NetraColors.cyan : NetraColors.textSecondary,
-                size: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? colors.primary.withValues(alpha: colors.isDark ? 0.15 : 0.10)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isSelected
+                    ? colors.primary.withValues(alpha: colors.isDark ? 0.35 : 0.25)
+                    : Colors.transparent,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isSelected ? NetraColors.textPrimary : NetraColors.textSecondary,
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? colors.primary : colors.textSecondary,
+                  size: 19,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? colors.textPrimary : colors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

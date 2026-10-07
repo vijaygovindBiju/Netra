@@ -15,6 +15,7 @@ class _WifiViewState extends ConsumerState<WifiView> {
   String _searchQuery = '';
 
   void _showConnectDialog(BuildContext context, AccessPoint ap) {
+    final colors = NetraColors.of(context);
     final passwordController = TextEditingController();
     bool obscurePassword = true;
 
@@ -24,19 +25,19 @@ class _WifiViewState extends ConsumerState<WifiView> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: NetraColors.surfaceCard,
+              backgroundColor: colors.surfaceCard,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: NetraColors.border),
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: colors.border),
               ),
               title: Row(
                 children: [
-                  const Icon(Icons.wifi_lock, color: NetraColors.cyan),
+                  Icon(Icons.wifi_lock, color: colors.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Connect to ${ap.ssid}',
-                      style: const TextStyle(color: NetraColors.textPrimary, fontSize: 18),
+                      style: TextStyle(color: colors.textPrimary, fontSize: 18),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -48,35 +49,35 @@ class _WifiViewState extends ConsumerState<WifiView> {
                 children: [
                   Text(
                     'Security: ${ap.security} • Band: ${ap.band}',
-                    style: const TextStyle(color: NetraColors.textSecondary, fontSize: 13),
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
                   if (ap.security != 'Open')
                     TextField(
                       controller: passwordController,
                       obscureText: obscurePassword,
-                      style: const TextStyle(color: NetraColors.textPrimary),
+                      style: TextStyle(color: colors.textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Passphrase',
-                        labelStyle: const TextStyle(color: NetraColors.textSecondary),
+                        labelStyle: TextStyle(color: colors.textSecondary),
                         filled: true,
-                        fillColor: NetraColors.surface,
+                        fillColor: colors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: NetraColors.border),
+                          borderSide: BorderSide(color: colors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: NetraColors.border),
+                          borderSide: BorderSide(color: colors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: NetraColors.cyan),
+                          borderSide: BorderSide(color: colors.primary),
                         ),
                         suffixIcon: IconButton(
                           icon: Icon(
                             obscurePassword ? Icons.visibility : Icons.visibility_off,
-                            color: NetraColors.textSecondary,
+                            color: colors.textSecondary,
                           ),
                           onPressed: () {
                             setDialogState(() {
@@ -91,12 +92,12 @@ class _WifiViewState extends ConsumerState<WifiView> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: NetraColors.textSecondary)),
+                  child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: NetraColors.cyan,
-                    foregroundColor: Colors.black,
+                    backgroundColor: colors.primary,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: () async {
@@ -107,10 +108,10 @@ class _WifiViewState extends ConsumerState<WifiView> {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          backgroundColor: success ? NetraColors.surfaceCard : NetraColors.red,
+                          backgroundColor: success ? colors.surfaceCard : colors.red,
                           content: Text(
                             success ? 'Connecting to ${ap.ssid}...' : 'Failed to connect to ${ap.ssid}',
-                            style: const TextStyle(color: NetraColors.textPrimary),
+                            style: TextStyle(color: colors.textPrimary),
                           ),
                         ),
                       );
@@ -128,6 +129,7 @@ class _WifiViewState extends ConsumerState<WifiView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = NetraColors.of(context);
     final netState = ref.watch(networkStateProvider);
     final connectedAp = netState.accessPoints.where((a) => a.isConnected).firstOrNull;
 
@@ -137,28 +139,28 @@ class _WifiViewState extends ConsumerState<WifiView> {
     }).toList();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Wi-Fi Networks',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: NetraColors.textPrimary,
+                      color: colors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Scan, authenticate, and manage wireless connections',
-                    style: TextStyle(color: NetraColors.textSecondary, fontSize: 14),
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -167,52 +169,53 @@ class _WifiViewState extends ConsumerState<WifiView> {
                     ? null
                     : () => ref.read(networkStateProvider.notifier).refreshScan(),
                 icon: netState.isLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: NetraColors.cyan),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: colors.primary),
                       )
-                    : const Icon(Icons.wifi_find, size: 18),
+                    : const Icon(Icons.wifi_find, size: 16),
                 label: Text(netState.isLoading ? 'Scanning...' : 'Scan Networks'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: NetraColors.surfaceCard,
-                  foregroundColor: NetraColors.cyan,
-                  side: const BorderSide(color: NetraColors.border),
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  backgroundColor: colors.surfaceCard,
+                  foregroundColor: colors.primary,
+                  side: BorderSide(color: colors.border),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // Active Connection Banner
           if (connectedAp != null) ...[
             Container(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    NetraColors.cyan.withOpacity(0.12),
-                    NetraColors.surfaceCard,
+                    colors.primary.withValues(alpha: colors.isDark ? 0.15 : 0.08),
+                    colors.surfaceCard,
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: NetraColors.cyan.withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.primary.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: NetraColors.green.withOpacity(0.15),
+                      color: colors.green.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.wifi, color: NetraColors.green, size: 28),
+                    child: Icon(Icons.wifi, color: colors.green, size: 26),
                   ),
-                  const SizedBox(width: 18),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,23 +224,23 @@ class _WifiViewState extends ConsumerState<WifiView> {
                           children: [
                             Text(
                               connectedAp.ssid,
-                              style: const TextStyle(
-                                fontSize: 20,
+                              style: TextStyle(
+                                fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: NetraColors.textPrimary,
+                                color: colors.textPrimary,
                               ),
                             ),
                             const SizedBox(width: 10),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: NetraColors.green.withOpacity(0.2),
+                                color: colors.green.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: const Text(
+                              child: Text(
                                 'CONNECTED',
                                 style: TextStyle(
-                                  color: NetraColors.green,
+                                  color: colors.green,
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -248,7 +251,7 @@ class _WifiViewState extends ConsumerState<WifiView> {
                         const SizedBox(height: 4),
                         Text(
                           'BSSID: ${connectedAp.bssid} • Band: ${connectedAp.band} • Security: ${connectedAp.security}',
-                          style: const TextStyle(color: NetraColors.textSecondary, fontSize: 13),
+                          style: TextStyle(color: colors.textSecondary, fontSize: 12),
                         ),
                       ],
                     ),
@@ -258,15 +261,15 @@ class _WifiViewState extends ConsumerState<WifiView> {
                     icon: const Icon(Icons.power_settings_new, size: 16),
                     label: const Text('Disconnect'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: NetraColors.red,
-                      side: const BorderSide(color: NetraColors.red),
+                      foregroundColor: colors.red,
+                      side: BorderSide(color: colors.red),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
           ],
 
           // Search and Filter Header
@@ -275,21 +278,21 @@ class _WifiViewState extends ConsumerState<WifiView> {
               Expanded(
                 child: TextField(
                   onChanged: (val) => setState(() => _searchQuery = val),
-                  style: const TextStyle(color: NetraColors.textPrimary),
+                  style: TextStyle(color: colors.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
                     hintText: 'Search visible networks...',
-                    hintStyle: const TextStyle(color: NetraColors.textMuted),
-                    prefixIcon: const Icon(Icons.search, color: NetraColors.textSecondary),
+                    hintStyle: TextStyle(color: colors.textMuted, fontSize: 13),
+                    prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 18),
                     filled: true,
-                    fillColor: NetraColors.surfaceCard,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    fillColor: colors.surfaceCard,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: NetraColors.border),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: colors.border),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: NetraColors.border),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: colors.border),
                     ),
                   ),
                 ),
@@ -298,33 +301,33 @@ class _WifiViewState extends ConsumerState<WifiView> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: NetraColors.surfaceCard,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: NetraColors.border),
+                  color: colors.surfaceCard,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: colors.border),
                 ),
                 child: Text(
                   '${filteredAps.length} Networks found',
-                  style: const TextStyle(color: NetraColors.textSecondary, fontSize: 13),
+                  style: TextStyle(color: colors.textSecondary, fontSize: 13),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // Available APs List
           Container(
             decoration: BoxDecoration(
-              color: NetraColors.surfaceCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: NetraColors.border),
+              color: colors.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border),
             ),
             child: filteredAps.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Center(
                       child: Text(
                         'No wireless networks matching filter',
-                        style: TextStyle(color: NetraColors.textMuted),
+                        style: TextStyle(color: colors.textMuted, fontSize: 13),
                       ),
                     ),
                   )
@@ -332,29 +335,29 @@ class _WifiViewState extends ConsumerState<WifiView> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: filteredAps.length,
-                    separatorBuilder: (_, __) => const Divider(color: NetraColors.border, height: 1),
+                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, idx) {
                       final ap = filteredAps[idx];
                       final isConnected = ap.isConnected;
 
                       final signalColor = ap.signalStrength > 70
-                          ? NetraColors.green
-                          : (ap.signalStrength > 40 ? NetraColors.cyan : NetraColors.amber);
+                          ? colors.green
+                          : (ap.signalStrength > 40 ? colors.primary : colors.amber);
 
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         leading: Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(9),
                           decoration: BoxDecoration(
-                            color: signalColor.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(10),
+                            color: signalColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             ap.signalStrength > 60
                                 ? Icons.wifi
                                 : (ap.signalStrength > 30 ? Icons.wifi_2_bar : Icons.wifi_1_bar),
                             color: signalColor,
-                            size: 22,
+                            size: 20,
                           ),
                         ),
                         title: Row(
@@ -362,29 +365,29 @@ class _WifiViewState extends ConsumerState<WifiView> {
                             Text(
                               ap.ssid,
                               style: TextStyle(
-                                color: isConnected ? NetraColors.green : NetraColors.textPrimary,
+                                color: isConnected ? colors.green : colors.textPrimary,
                                 fontWeight: FontWeight.w600,
-                                fontSize: 15,
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            _Badge(text: ap.band, color: NetraColors.violet),
+                            const SizedBox(width: 8),
+                            _Badge(text: ap.band, color: colors.secondary),
                             const SizedBox(width: 6),
-                            _Badge(text: ap.security, color: NetraColors.cyan),
+                            _Badge(text: ap.security, color: colors.primary),
                           ],
                         ),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4.0),
                           child: Text(
                             'Signal: ${ap.signalStrength}% • BSSID: ${ap.bssid}',
-                            style: const TextStyle(color: NetraColors.textSecondary, fontSize: 12),
+                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
                           ),
                         ),
                         trailing: isConnected
-                            ? const Text(
+                            ? Text(
                                 'Active',
                                 style: TextStyle(
-                                  color: NetraColors.green,
+                                  color: colors.green,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -392,9 +395,9 @@ class _WifiViewState extends ConsumerState<WifiView> {
                             : ElevatedButton(
                                 onPressed: () => _showConnectDialog(context, ap),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: NetraColors.surface,
-                                  foregroundColor: NetraColors.cyan,
-                                  side: const BorderSide(color: NetraColors.border),
+                                  backgroundColor: colors.surface,
+                                  foregroundColor: colors.primary,
+                                  side: BorderSide(color: colors.border),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 child: const Text('Connect'),
@@ -418,15 +421,15 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Text(
         text,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500),
       ),
     );
   }

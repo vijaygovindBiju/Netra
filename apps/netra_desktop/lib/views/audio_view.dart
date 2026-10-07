@@ -22,24 +22,26 @@ class _AudioViewState extends ConsumerState<AudioView> {
   }
 
   void _showCreateDualAudioDialog(BuildContext context, List<AudioSinkItem> sinks) {
+    final colors = NetraColors.of(context);
+
     showDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: NetraColors.surfaceCard,
+              backgroundColor: colors.surfaceCard,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: NetraColors.border),
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: colors.border),
               ),
-              title: const Row(
+              title: Row(
                 children: [
-                  Icon(Icons.headset, color: NetraColors.cyan),
-                  SizedBox(width: 10),
+                  Icon(Icons.headset, color: colors.primary),
+                  const SizedBox(width: 10),
                   Text(
                     'Create Multi-Device Audio Group',
-                    style: TextStyle(color: NetraColors.textPrimary, fontSize: 18),
+                    style: TextStyle(color: colors.textPrimary, fontSize: 18),
                   ),
                 ],
               ),
@@ -49,52 +51,55 @@ class _AudioViewState extends ConsumerState<AudioView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Broadcast media playback across multiple Bluetooth headphones or speakers simultaneously with clock sync.',
-                      style: TextStyle(color: NetraColors.textSecondary, fontSize: 13),
+                      style: TextStyle(color: colors.textSecondary, fontSize: 13),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 16),
                     TextField(
                       controller: _groupNameController,
-                      style: const TextStyle(color: NetraColors.textPrimary),
+                      style: TextStyle(color: colors.textPrimary, fontSize: 13),
                       decoration: InputDecoration(
                         labelText: 'Group Name',
-                        labelStyle: const TextStyle(color: NetraColors.textSecondary),
+                        labelStyle: TextStyle(color: colors.textSecondary),
                         filled: true,
-                        fillColor: NetraColors.surface,
+                        fillColor: colors.surface,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: NetraColors.border),
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: colors.border),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text('Select Target Sinks to Sync:', style: TextStyle(color: NetraColors.textPrimary, fontWeight: FontWeight.bold)),
+                    Text(
+                      'Select Target Sinks to Sync:',
+                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       constraints: const BoxConstraints(maxHeight: 180),
                       decoration: BoxDecoration(
-                        color: NetraColors.surface,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: NetraColors.border),
+                        color: colors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: colors.border),
                       ),
                       child: ListView.separated(
                         shrinkWrap: true,
                         itemCount: sinks.where((s) => !s.isVirtual).length,
-                        separatorBuilder: (_, __) => const Divider(color: NetraColors.border, height: 1),
+                        separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
                         itemBuilder: (context, idx) {
                           final sink = sinks.where((s) => !s.isVirtual).toList()[idx];
                           final isSelected = _selectedMultiSinkSlaves.contains(sink.name);
 
                           return CheckboxListTile(
                             value: isSelected,
-                            activeColor: NetraColors.cyan,
-                            checkColor: Colors.black,
+                            activeColor: colors.primary,
+                            checkColor: Colors.white,
                             title: Text(
                               sink.description.isNotEmpty ? sink.description : sink.name,
-                              style: const TextStyle(color: NetraColors.textPrimary, fontSize: 13),
+                              style: TextStyle(color: colors.textPrimary, fontSize: 13),
                             ),
-                            subtitle: Text(sink.name, style: const TextStyle(color: NetraColors.textMuted, fontSize: 11)),
+                            subtitle: Text(sink.name, style: TextStyle(color: colors.textMuted, fontSize: 11)),
                             onChanged: (val) {
                               setDialogState(() {
                                 if (val == true) {
@@ -114,12 +119,12 @@ class _AudioViewState extends ConsumerState<AudioView> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel', style: TextStyle(color: NetraColors.textSecondary)),
+                  child: Text('Cancel', style: TextStyle(color: colors.textSecondary)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: NetraColors.cyan,
-                    foregroundColor: Colors.black,
+                    backgroundColor: colors.primary,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: _selectedMultiSinkSlaves.length < 2
@@ -143,85 +148,87 @@ class _AudioViewState extends ConsumerState<AudioView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = NetraColors.of(context);
     final audioState = ref.watch(audioStateProvider);
     final notifier = ref.read(audioStateProvider.notifier);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'PipeWire Audio Orchestrator',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: NetraColors.textPrimary,
+                      color: colors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Multi-Bluetooth simultaneous audio, latency compensation, and per-app stream routing',
-                    style: TextStyle(color: NetraColors.textSecondary, fontSize: 14),
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
               ElevatedButton.icon(
                 onPressed: () => _showCreateDualAudioDialog(context, audioState.sinks),
-                icon: const Icon(Icons.group_work, size: 18, color: Colors.black),
+                icon: const Icon(Icons.group_work, size: 16, color: Colors.white),
                 label: const Text(
                   'Create Multi-Device Sync',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: NetraColors.cyan,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  backgroundColor: colors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // 1. Application Audio Stream Routing Matrix
           Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: NetraColors.surfaceCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: NetraColors.border),
+              color: colors.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.alt_route, color: NetraColors.cyan, size: 20),
-                    SizedBox(width: 10),
+                    Icon(Icons.alt_route, color: colors.primary, size: 20),
+                    const SizedBox(width: 10),
                     Text(
                       'Per-Application Audio Routing Matrix',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: NetraColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 if (audioState.streams.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
                         'No applications are currently playing audio',
-                        style: TextStyle(color: NetraColors.textMuted),
+                        style: TextStyle(color: colors.textMuted, fontSize: 13),
                       ),
                     ),
                   )
@@ -230,52 +237,53 @@ class _AudioViewState extends ConsumerState<AudioView> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: audioState.streams.length,
-                    separatorBuilder: (_, __) => const Divider(color: NetraColors.border),
+                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 12),
                     itemBuilder: (context, idx) {
                       final stream = audioState.streams[idx];
                       return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
                             CircleAvatar(
-                              backgroundColor: NetraColors.violet.withOpacity(0.15),
-                              child: const Icon(Icons.music_note, color: NetraColors.violet, size: 18),
+                              radius: 16,
+                              backgroundColor: colors.secondary.withValues(alpha: 0.15),
+                              child: Icon(Icons.music_note, color: colors.secondary, size: 16),
                             ),
-                            const SizedBox(width: 14),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     stream.appName,
-                                    style: const TextStyle(
-                                      color: NetraColors.textPrimary,
+                                    style: TextStyle(
+                                      color: colors.textPrimary,
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 14,
+                                      fontSize: 13,
                                     ),
                                   ),
                                   Text(
                                     stream.binaryName.isNotEmpty ? stream.binaryName : 'Stream #${stream.id}',
-                                    style: const TextStyle(color: NetraColors.textSecondary, fontSize: 12),
+                                    style: TextStyle(color: colors.textSecondary, fontSize: 11),
                                   ),
                                 ],
                               ),
                             ),
                             // Route Dropdown
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
                               decoration: BoxDecoration(
-                                color: NetraColors.surface,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: NetraColors.border),
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: colors.border),
                               ),
                               child: DropdownButton<int>(
                                 value: audioState.sinks.any((s) => s.id == stream.currentSinkId)
                                     ? stream.currentSinkId
                                     : (audioState.sinks.isNotEmpty ? audioState.sinks.first.id : null),
-                                dropdownColor: NetraColors.surfaceCard,
+                                dropdownColor: colors.surfaceCard,
                                 underline: const SizedBox(),
-                                style: const TextStyle(color: NetraColors.cyan, fontSize: 13, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: colors.primary, fontSize: 12, fontWeight: FontWeight.bold),
                                 items: audioState.sinks.map((sink) {
                                   return DropdownMenuItem<int>(
                                     value: sink.id,
@@ -285,8 +293,8 @@ class _AudioViewState extends ConsumerState<AudioView> {
                                           sink.isBluetooth
                                               ? Icons.bluetooth_audio
                                               : (sink.isVirtual ? Icons.group_work : Icons.speaker),
-                                          size: 16,
-                                          color: sink.isVirtual ? NetraColors.cyan : NetraColors.textSecondary,
+                                          size: 15,
+                                          color: sink.isVirtual ? colors.primary : colors.textSecondary,
                                         ),
                                         const SizedBox(width: 8),
                                         Text(sink.description.length > 28
@@ -311,120 +319,119 @@ class _AudioViewState extends ConsumerState<AudioView> {
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // 2. Physical & Virtual Audio Sinks Panel
           Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: NetraColors.surfaceCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: NetraColors.border),
+              color: colors.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.speaker_group, color: NetraColors.violet, size: 20),
-                    SizedBox(width: 10),
+                    Icon(Icons.speaker_group, color: colors.secondary, size: 20),
+                    const SizedBox(width: 10),
                     Text(
                       'Audio Output Endpoints & Latency Sync',
                       style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: NetraColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textPrimary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 ListView.separated(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: audioState.sinks.length,
-                  separatorBuilder: (_, __) => const Divider(color: NetraColors.border),
+                  separatorBuilder: (_, __) => Divider(color: colors.border, height: 16),
                   itemBuilder: (context, idx) {
                     final sink = audioState.sinks[idx];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              sink.isBluetooth
+                                  ? Icons.bluetooth_audio
+                                  : (sink.isVirtual ? Icons.group_work : Icons.speaker),
+                              color: sink.isVirtual ? colors.primary : colors.textSecondary,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                sink.description,
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            if (sink.isVirtual) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: colors.primary.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('MULTI-AUDIO MASTER',
+                                    style: TextStyle(fontSize: 9, color: colors.primary, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+                            Text('${sink.volumePercent}%',
+                                style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                            IconButton(
+                              icon: Icon(
+                                sink.isMuted ? Icons.volume_off : Icons.volume_up,
+                                color: sink.isMuted ? colors.red : colors.textSecondary,
+                                size: 18,
+                              ),
+                              onPressed: () => notifier.setMute(sink.id, !sink.isMuted),
+                            ),
+                          ],
+                        ),
+                        // Volume Slider
+                        Slider(
+                          value: sink.volumePercent.toDouble().clamp(0.0, 100.0),
+                          min: 0,
+                          max: 100,
+                          activeColor: colors.primary,
+                          inactiveColor: colors.surface,
+                          onChanged: (val) => notifier.setVolume(sink.id, val.toInt()),
+                        ),
+                        // Latency Offset Slider
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: Row(
                             children: [
-                              Icon(
-                                sink.isBluetooth
-                                    ? Icons.bluetooth_audio
-                                    : (sink.isVirtual ? Icons.group_work : Icons.speaker),
-                                color: sink.isVirtual ? NetraColors.cyan : NetraColors.textSecondary,
-                              ),
-                              const SizedBox(width: 12),
+                              Text('Latency Compensation: ', style: TextStyle(color: colors.textMuted, fontSize: 11)),
+                              Text('${sink.latencyOffsetMs}ms',
+                                  style: TextStyle(color: colors.secondary, fontSize: 11, fontWeight: FontWeight.bold)),
                               Expanded(
-                                child: Text(
-                                  sink.description,
-                                  style: const TextStyle(
-                                    color: NetraColors.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
+                                child: Slider(
+                                  value: sink.latencyOffsetMs.toDouble().clamp(-100.0, 150.0),
+                                  min: -100,
+                                  max: 150,
+                                  activeColor: colors.secondary,
+                                  inactiveColor: colors.surface,
+                                  onChanged: (val) => notifier.setLatencyOffset(sink.id, val.toInt()),
                                 ),
-                              ),
-                              if (sink.isVirtual) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: NetraColors.cyan.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text('MULTI-AUDIO MASTER',
-                                      style: TextStyle(fontSize: 10, color: NetraColors.cyan, fontWeight: FontWeight.bold)),
-                                ),
-                                const SizedBox(width: 10),
-                              ],
-                              Text('${sink.volumePercent}%',
-                                  style: const TextStyle(color: NetraColors.cyan, fontWeight: FontWeight.bold)),
-                              IconButton(
-                                icon: Icon(
-                                  sink.isMuted ? Icons.volume_off : Icons.volume_up,
-                                  color: sink.isMuted ? NetraColors.red : NetraColors.textSecondary,
-                                ),
-                                onPressed: () => notifier.setMute(sink.id, !sink.isMuted),
                               ),
                             ],
                           ),
-                          // Volume Slider
-                          Slider(
-                            value: sink.volumePercent.toDouble().clamp(0.0, 100.0),
-                            min: 0,
-                            max: 100,
-                            activeColor: NetraColors.cyan,
-                            inactiveColor: NetraColors.surface,
-                            onChanged: (val) => notifier.setVolume(sink.id, val.toInt()),
-                          ),
-                          // Latency Offset Slider (Sync Dual Headphones)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                const Text('Latency Compensation: ', style: TextStyle(color: NetraColors.textMuted, fontSize: 11)),
-                                Text('${sink.latencyOffsetMs}ms',
-                                    style: const TextStyle(color: NetraColors.violet, fontSize: 11, fontWeight: FontWeight.bold)),
-                                Expanded(
-                                  child: Slider(
-                                    value: sink.latencyOffsetMs.toDouble().clamp(-100.0, 150.0),
-                                    min: -100,
-                                    max: 150,
-                                    activeColor: NetraColors.violet,
-                                    inactiveColor: NetraColors.surface,
-                                    onChanged: (val) => notifier.setLatencyOffset(sink.id, val.toInt()),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     );
                   },
                 ),

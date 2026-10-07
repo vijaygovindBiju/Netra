@@ -26,32 +26,33 @@ class BluetoothView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colors = NetraColors.of(context);
     final btState = ref.watch(bluetoothStateProvider);
     final notifier = ref.read(bluetoothStateProvider.notifier);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(28.0),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Bluetooth Control Center',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
-                      color: NetraColors.textPrimary,
+                      color: colors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Pair, manage devices, monitor battery levels, and configure multi-device links',
-                    style: TextStyle(color: NetraColors.textSecondary, fontSize: 14),
+                    style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
@@ -67,45 +68,46 @@ class BluetoothView extends ConsumerWidget {
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Icon(
                         btState.isScanning ? Icons.stop : Icons.bluetooth_searching,
                         size: 18,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                 label: Text(
                   btState.isScanning ? 'Stop Discovery' : 'Discover Devices',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: NetraColors.cyan,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  backgroundColor: colors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
 
           // Connected & Paired Devices Section
           Container(
             decoration: BoxDecoration(
-              color: NetraColors.surfaceCard,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: NetraColors.border),
+              color: colors.surfaceCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border),
             ),
             child: btState.devices.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
                     child: Center(
                       child: Column(
                         children: [
-                          Icon(Icons.bluetooth_disabled, size: 40, color: NetraColors.textMuted),
-                          SizedBox(height: 12),
+                          Icon(Icons.bluetooth_disabled, size: 36, color: colors.textMuted),
+                          const SizedBox(height: 10),
                           Text(
                             'No Bluetooth devices found. Click Discover to scan.',
-                            style: TextStyle(color: NetraColors.textMuted),
+                            style: TextStyle(color: colors.textMuted, fontSize: 13),
                           ),
                         ],
                       ),
@@ -115,28 +117,28 @@ class BluetoothView extends ConsumerWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: btState.devices.length,
-                    separatorBuilder: (_, __) => const Divider(color: NetraColors.border, height: 1),
+                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
                     itemBuilder: (context, idx) {
                       final device = btState.devices[idx];
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                         leading: Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: device.isConnected
-                                ? NetraColors.cyan.withOpacity(0.15)
-                                : NetraColors.surface,
-                            borderRadius: BorderRadius.circular(12),
+                                ? colors.primary.withValues(alpha: 0.15)
+                                : colors.surface,
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: device.isConnected
-                                  ? NetraColors.cyan.withOpacity(0.3)
-                                  : NetraColors.border,
+                                  ? colors.primary.withValues(alpha: 0.3)
+                                  : colors.border,
                             ),
                           ),
                           child: Icon(
                             _getCategoryIcon(device.category),
-                            color: device.isConnected ? NetraColors.cyan : NetraColors.textSecondary,
-                            size: 22,
+                            color: device.isConnected ? colors.primary : colors.textSecondary,
+                            size: 20,
                           ),
                         ),
                         title: Row(
@@ -144,23 +146,23 @@ class BluetoothView extends ConsumerWidget {
                             Text(
                               device.alias.isNotEmpty ? device.alias : device.name,
                               style: TextStyle(
-                                color: device.isConnected ? NetraColors.cyan : NetraColors.textPrimary,
+                                color: device.isConnected ? colors.primary : colors.textPrimary,
                                 fontWeight: FontWeight.bold,
-                                fontSize: 15,
+                                fontSize: 14,
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 8),
                             if (device.isConnected)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: NetraColors.green.withOpacity(0.2),
+                                  color: colors.green.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'CONNECTED',
                                   style: TextStyle(
-                                    color: NetraColors.green,
+                                    color: colors.green,
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -171,19 +173,19 @@ class BluetoothView extends ConsumerWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: NetraColors.cyan.withOpacity(0.12),
+                                  color: colors.primary.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.battery_charging_full, size: 12, color: NetraColors.cyan),
+                                    Icon(Icons.battery_charging_full, size: 12, color: colors.primary),
                                     const SizedBox(width: 4),
                                     Text(
                                       '${device.batteryPercentage}%',
-                                      style: const TextStyle(
-                                        color: NetraColors.cyan,
-                                        fontSize: 11,
+                                      style: TextStyle(
+                                        color: colors.primary,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -197,7 +199,7 @@ class BluetoothView extends ConsumerWidget {
                           padding: const EdgeInsets.only(top: 4.0),
                           child: Text(
                             '${device.address} • ${device.isPaired ? "Paired" : "Discovered"}',
-                            style: const TextStyle(color: NetraColors.textSecondary, fontSize: 12),
+                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
                           ),
                         ),
                         trailing: Row(
@@ -207,8 +209,8 @@ class BluetoothView extends ConsumerWidget {
                               OutlinedButton(
                                 onPressed: () => notifier.disconnect(device.address),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: NetraColors.red,
-                                  side: const BorderSide(color: NetraColors.red),
+                                  foregroundColor: colors.red,
+                                  side: BorderSide(color: colors.red),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 child: const Text('Disconnect'),
@@ -217,8 +219,8 @@ class BluetoothView extends ConsumerWidget {
                               ElevatedButton(
                                 onPressed: () => notifier.connect(device.address),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: NetraColors.cyan,
-                                  foregroundColor: Colors.black,
+                                  backgroundColor: colors.primary,
+                                  foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 child: const Text('Connect', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -227,9 +229,9 @@ class BluetoothView extends ConsumerWidget {
                               ElevatedButton(
                                 onPressed: () => notifier.pair(device.address),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: NetraColors.surface,
-                                  foregroundColor: NetraColors.cyan,
-                                  side: const BorderSide(color: NetraColors.border),
+                                  backgroundColor: colors.surface,
+                                  foregroundColor: colors.primary,
+                                  side: BorderSide(color: colors.border),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
                                 child: const Text('Pair'),
