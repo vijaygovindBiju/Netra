@@ -1,0 +1,81 @@
+name: Netra CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  rust-backend:
+    name: Rust Backend CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev pkg-config
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cargo Check Workspace
+        run: cargo check --workspace --all-targets
+
+      - name: Cargo Test Workspace
+        run: cargo test --workspace --verbose
+
+      - name: Cargo Build Release
+        run: cargo build --release --workspace
+
+  flutter-frontend:
+    name: Flutter Desktop CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Linux Desktop Support
+        run: flutter config --enable-linux-desktop
+
+      - name: Pub Get
+        run: |
+          cd apps/netra_desktop
+          flutter pub get
+
+      - name: Flutter Test
+        run: |
+          cd apps/netra_desktop
+          flutter test
+
+      - name: Flutter Build Linux Release
+        run: |
+          cd apps/netra_desktop
+          flutter build linux --release
