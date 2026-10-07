@@ -4,6 +4,12 @@ import '../models/traffic_models.dart';
 import '../providers/netra_providers.dart';
 import '../theme/netra_theme.dart';
 
+enum TrafficViewMode {
+  sameApp,
+  category,
+  flat,
+}
+
 class TrafficView extends ConsumerStatefulWidget {
   const TrafficView({super.key});
 
@@ -14,7 +20,9 @@ class TrafficView extends ConsumerStatefulWidget {
 class _TrafficViewState extends ConsumerState<TrafficView> {
   String _search = '';
   String _sortBy = 'data'; // 'data', 'speed', 'name'
-  bool _isGroupedView = true;
+  TrafficViewMode _viewMode = TrafficViewMode.sameApp;
+
+  final Set<String> _expandedAppNames = {};
   final Set<AppCategoryType> _expandedCategories = {
     AppCategoryType.browsers,
     AppCategoryType.communication,
@@ -38,6 +46,17 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     return '${(bps / (1024 * 1024)).toStringAsFixed(2)} MB/s';
   }
 
+  void _toggleApp(String appName) {
+    setState(() {
+      final key = appName.toLowerCase();
+      if (_expandedAppNames.contains(key)) {
+        _expandedAppNames.remove(key);
+      } else {
+        _expandedAppNames.add(key);
+      }
+    });
+  }
+
   void _toggleCategory(AppCategoryType type) {
     setState(() {
       if (_expandedCategories.contains(type)) {
@@ -48,15 +67,23 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     });
   }
 
-  void _expandAll(List<AppGroup> groups) {
+  void _expandAll(List<NamedAppGroup> namedGroups, List<AppGroup> categoryGroups) {
     setState(() {
-      _expandedCategories.addAll(groups.map((g) => g.type));
+      if (_viewMode == TrafficViewMode.sameApp) {
+        _expandedAppNames.addAll(namedGroups.map((g) => g.appName.toLowerCase()));
+      } else {
+        _expandedCategories.addAll(categoryGroups.map((g) => g.type));
+      }
     });
   }
 
   void _collapseAll() {
     setState(() {
-      _expandedCategories.clear();
+      if (_viewMode == TrafficViewMode.sameApp) {
+        _expandedAppNames.clear();
+      } else {
+        _expandedCategories.clear();
+      }
     });
   }
 
@@ -84,9 +111,10 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     }).toList();
 
     // Grouping
-    final appGroups = AppCategorizer.groupProcesses(filtered);
+    final namedAppGroups = AppCategorizer.groupByAppName(filtered);
+    final categoryGroups = AppCategorizer.groupProcesses(filtered);
 
-    // Sort flat list
+    // Flat List
     final flatList = List<ProcessTrafficItem>.from(filtered);
     if (_sortBy == 'data') {
       flatList.sort((a, b) => (b.totalRxBytes + b.totalTxBytes).compareTo(a.totalRxBytes + a.totalTxBytes));
@@ -119,7 +147,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Live process socket telemetry, app category grouping, and bandwidth consumption',
+                      'Live process socket telemetry, same-app grouping, and bandwidth consumption',
                       style: TextStyle(color: colors.textSecondary, fontSize: 13),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -149,10 +177,10 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
             children: [
               Expanded(
                 child: _SummaryCard(
-                  title: 'Network Processes',
-                  value: '${trafficState.processes.length}',
-                  subtext: '${appGroups.length} App Categories',
-                  icon: Icons.memory,
+                  title: 'Unique Applications',
+                  value: '${namedAppGroups.length}',
+                  subtext: '${trafficState.processes.length} Active PIDs',
+                  icon: Icons.apps,
                   iconColor: colors.primary,
                   colors: colors,
                 ),
@@ -194,7 +222,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
           ),
           const SizedBox(height: 20),
 
-          // Search & View Controls Bar
+          // Search & View Mode Controls Bar
           Row(
             children: [
               // Search Input
@@ -203,7 +231,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                   onChanged: (val) => setState(() => _search = val),
                   style: TextStyle(color: colors.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
-                    hintText: 'Filter processes by name, command, or PID...',
+                    hintText: 'Filter applications by name, command, or PID...',
                     hintStyle: TextStyle(color: colors.textMuted, fontSize: 13),
                     prefixIcon: Icon(Icons.search, color: colors.textSecondary, size: 18),
                     filled: true,
@@ -226,7 +254,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
               ),
               const SizedBox(width: 12),
 
-              // View Mode Selector (Grouped vs Flat)
+              // View Mode Selector (Same App vs Categories vs Flat)
               Container(
                 decoration: BoxDecoration(
                   color: colors.surfaceCard,
@@ -236,39 +264,46 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                 child: Row(
                   children: [
                     _ViewModeButton(
-                      label: 'Collapsible Groups',
+                      label: 'Same App Name',
+                      icon: Icons.auto_awesome_motion,
+                      isSelected: _viewMode == TrafficViewMode.sameApp,
+                      onTap: () => setState(() => _viewMode = TrafficViewMode.sameApp),
+                      colors: colors,
+                    ),
+                    _ViewModeButton(
+                      label: 'Categories',
                       icon: Icons.folder_outlined,
-                      isSelected: _isGroupedView,
-                      onTap: () => setState(() => _isGroupedView = true),
+                      isSelected: _viewMode == TrafficViewMode.category,
+                      onTap: () => setState(() => _viewMode = TrafficViewMode.category),
                       colors: colors,
                     ),
                     _ViewModeButton(
                       label: 'Flat List',
                       icon: Icons.list_alt,
-                      isSelected: !_isGroupedView,
-                      onTap: () => setState(() => _isGroupedView = false),
+                      isSelected: _viewMode == TrafficViewMode.flat,
+                      onTap: () => setState(() => _viewMode = TrafficViewMode.flat),
                       colors: colors,
                     ),
                   ],
                 ),
               ),
 
-              if (_isGroupedView) ...[
+              if (_viewMode != TrafficViewMode.flat) ...[
                 const SizedBox(width: 12),
-                // Expand / Collapse All
+                // Expand / Collapse All Button
                 OutlinedButton.icon(
                   onPressed: () {
-                    if (_expandedCategories.isEmpty) {
-                      _expandAll(appGroups);
+                    final isCollapsed = (_viewMode == TrafficViewMode.sameApp)
+                        ? _expandedAppNames.isEmpty
+                        : _expandedCategories.isEmpty;
+                    if (isCollapsed) {
+                      _expandAll(namedAppGroups, categoryGroups);
                     } else {
                       _collapseAll();
                     }
                   },
-                  icon: Icon(
-                    _expandedCategories.isEmpty ? Icons.unfold_more : Icons.unfold_less,
-                    size: 16,
-                  ),
-                  label: Text(_expandedCategories.isEmpty ? 'Expand All' : 'Collapse All'),
+                  icon: const Icon(Icons.unfold_more, size: 16),
+                  label: const Text('Toggle All'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colors.primary,
                     side: BorderSide(color: colors.border),
@@ -308,9 +343,11 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
           ),
           const SizedBox(height: 16),
 
-          // Main Content View
-          if (_isGroupedView)
-            _buildGroupedView(appGroups, colors)
+          // Main Content View based on Selected ViewMode
+          if (_viewMode == TrafficViewMode.sameApp)
+            _buildSameAppGroupView(namedAppGroups, colors)
+          else if (_viewMode == TrafficViewMode.category)
+            _buildCategoryGroupView(categoryGroups, colors)
           else
             _buildFlatView(flatList, colors),
         ],
@@ -318,8 +355,278 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     );
   }
 
-  // 1. Collapsible Grouped Accordion View
-  Widget _buildGroupedView(List<AppGroup> groups, NetraPalette colors) {
+  // 1. Grouped by Same App Name View
+  Widget _buildSameAppGroupView(List<NamedAppGroup> groups, NetraPalette colors) {
+    if (groups.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: colors.surfaceCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.border),
+        ),
+        child: Center(
+          child: Text(
+            'No matching network applications active',
+            style: TextStyle(color: colors.textMuted, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: groups.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, idx) {
+        final app = groups[idx];
+        final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
+        final appTotalBytes = app.totalBytes;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: colors.surfaceCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isExpanded
+                  ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
+                  : colors.border,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Card for Application
+              InkWell(
+                onTap: () => _toggleApp(app.appName.toLowerCase()),
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  child: Row(
+                    children: [
+                      // App Icon
+                      Container(
+                        padding: const EdgeInsets.all(9),
+                        decoration: BoxDecoration(
+                          color: app.accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(app.icon, color: app.accentColor, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+
+                      // App Name & Worker Count
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                app.displayName,
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.surface,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: colors.border),
+                              ),
+                              child: Text(
+                                app.processCount == 1
+                                    ? 'PID ${app.processes.first.pid}'
+                                    : '${app.processCount} processes (${app.totalSockets} sockets)',
+                                style: TextStyle(
+                                  color: colors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Aggregate Speed
+                      Text(
+                        '↓ ${_formatSpeed(app.totalRxRate)} • ↑ ${_formatSpeed(app.totalTxRate)}',
+                        style: TextStyle(
+                          color: colors.green,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Aggregate Total Data
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: app.accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _formatBytes(appTotalBytes),
+                          style: TextStyle(
+                            color: app.accentColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Rotating Chevron
+                      AnimatedRotation(
+                        turns: isExpanded ? 0.5 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.keyboard_arrow_down,
+                          color: colors.textSecondary,
+                          size: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Expanded Child Worker PIDs
+              if (isExpanded) ...[
+                Divider(color: colors.border, height: 1),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 8),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: app.processes.length,
+                    separatorBuilder: (_, __) => Divider(color: colors.border, height: 1),
+                    itemBuilder: (context, pIdx) {
+                      final proc = app.processes[pIdx];
+                      final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
+                      final ratio = (appTotalBytes > 0)
+                          ? (procTotalBytes / appTotalBytes).clamp(0.05, 1.0)
+                          : 0.05;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                // PID and Command line
+                                Expanded(
+                                  flex: 4,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: colors.surface,
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: colors.border),
+                                            ),
+                                            child: Text(
+                                              'PID ${proc.pid}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: colors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${proc.openSocketCount} open sockets',
+                                            style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        proc.cmdline.isNotEmpty ? proc.cmdline : proc.name,
+                                        style: TextStyle(color: colors.textMuted, fontSize: 11),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                // Speed
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    '↓ ${_formatSpeed(proc.rxRateBps)} • ↑ ${_formatSpeed(proc.txRateBps)}',
+                                    style: TextStyle(
+                                      color: colors.green,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+
+                                // Data
+                                Expanded(
+                                  flex: 2,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        _formatBytes(procTotalBytes),
+                                        style: TextStyle(
+                                          color: colors.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '↓ ${_formatBytes(proc.totalRxBytes)}',
+                                        style: TextStyle(color: colors.textMuted, fontSize: 10),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            // Proportion bar
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: ratio,
+                                minHeight: 3,
+                                backgroundColor: colors.border,
+                                valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 2. Category Group View
+  Widget _buildCategoryGroupView(List<AppGroup> groups, NetraPalette colors) {
     if (groups.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(40),
@@ -360,7 +667,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Accordion Header Tile
               InkWell(
                 onTap: () => _toggleCategory(group.type),
                 borderRadius: BorderRadius.circular(14),
@@ -368,7 +674,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                   child: Row(
                     children: [
-                      // Category Icon with Accent Container
                       Container(
                         padding: const EdgeInsets.all(9),
                         decoration: BoxDecoration(
@@ -378,8 +683,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                         child: Icon(group.icon, color: group.accentColor, size: 20),
                       ),
                       const SizedBox(width: 14),
-
-                      // Category Title & Count
                       Expanded(
                         child: Row(
                           children: [
@@ -400,7 +703,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                                 border: Border.all(color: colors.border),
                               ),
                               child: Text(
-                                '${group.processes.length} app${group.processes.length == 1 ? "" : "s"}',
+                                '${group.processes.length} apps',
                                 style: TextStyle(
                                   color: colors.textSecondary,
                                   fontSize: 11,
@@ -411,8 +714,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                           ],
                         ),
                       ),
-
-                      // Aggregate Speed
                       Text(
                         '↓ ${_formatSpeed(group.totalRxRate)} • ↑ ${_formatSpeed(group.totalTxRate)}',
                         style: TextStyle(
@@ -422,8 +723,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                         ),
                       ),
                       const SizedBox(width: 16),
-
-                      // Aggregate Total Data
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -440,8 +739,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                         ),
                       ),
                       const SizedBox(width: 12),
-
-                      // Expand / Collapse Chevron
                       AnimatedRotation(
                         turns: isExpanded ? 0.5 : 0.0,
                         duration: const Duration(milliseconds: 200),
@@ -455,8 +752,6 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                   ),
                 ),
               ),
-
-              // Accordion Body (Collapsible Process Subtable)
               if (isExpanded) ...[
                 Divider(color: colors.border, height: 1),
                 Padding(
@@ -469,135 +764,18 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                     itemBuilder: (context, pIdx) {
                       final proc = group.processes[pIdx];
                       final procTotalBytes = proc.totalRxBytes + proc.totalTxBytes;
-                      final ratio = (groupTotalBytes > 0)
-                          ? (procTotalBytes / groupTotalBytes).clamp(0.05, 1.0)
-                          : 0.05;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                        title: Row(
                           children: [
-                            Row(
-                              children: [
-                                // Process Name & PID
-                                Expanded(
-                                  flex: 4,
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: group.accentColor.withValues(alpha: 0.15),
-                                        child: Text(
-                                          proc.name.isNotEmpty ? proc.name[0].toUpperCase() : '?',
-                                          style: TextStyle(
-                                            color: group.accentColor,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    proc.name,
-                                                    style: TextStyle(
-                                                      color: colors.textPrimary,
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 13,
-                                                    ),
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                                  decoration: BoxDecoration(
-                                                    color: colors.surface,
-                                                    borderRadius: BorderRadius.circular(4),
-                                                    border: Border.all(color: colors.border),
-                                                  ),
-                                                  child: Text(
-                                                    'PID ${proc.pid}',
-                                                    style: TextStyle(fontSize: 10, color: colors.textSecondary),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              proc.cmdline.isNotEmpty ? proc.cmdline : 'Process #${proc.pid}',
-                                              style: TextStyle(color: colors.textMuted, fontSize: 11),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Sockets
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    '${proc.openSocketCount} sockets',
-                                    style: TextStyle(color: colors.textSecondary, fontSize: 11),
-                                  ),
-                                ),
-
-                                // Speed
-                                Expanded(
-                                  flex: 2,
-                                  child: Text(
-                                    '↓ ${_formatSpeed(proc.rxRateBps)}  ↑ ${_formatSpeed(proc.txRateBps)}',
-                                    style: TextStyle(
-                                      color: colors.green,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ),
-
-                                // Data Usage Total
-                                Expanded(
-                                  flex: 2,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        _formatBytes(procTotalBytes),
-                                        style: TextStyle(
-                                          color: colors.textPrimary,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            // Proportion bar relative to category
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: LinearProgressIndicator(
-                                value: ratio,
-                                minHeight: 3,
-                                backgroundColor: colors.border,
-                                valueColor: AlwaysStoppedAnimation<Color>(group.accentColor),
-                              ),
-                            ),
+                            Text(proc.name, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(width: 8),
+                            Text('PID ${proc.pid}', style: TextStyle(color: colors.textSecondary, fontSize: 11)),
                           ],
                         ),
+                        subtitle: Text(proc.cmdline.isNotEmpty ? proc.cmdline : proc.name, style: TextStyle(color: colors.textMuted, fontSize: 11)),
+                        trailing: Text(_formatBytes(procTotalBytes), style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
                       );
                     },
                   ),
@@ -610,7 +788,7 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
     );
   }
 
-  // 2. Flat Process List View
+  // 3. Flat Process List View
   Widget _buildFlatView(List<ProcessTrafficItem> list, NetraPalette colors) {
     return Container(
       decoration: BoxDecoration(
@@ -757,24 +935,9 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                           ),
                           Expanded(
                             flex: 2,
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                  decoration: BoxDecoration(
-                                    color: colors.primary.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    '${proc.openSocketCount} sockets',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: colors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              '${proc.openSocketCount} sockets',
+                              style: TextStyle(fontSize: 11, color: colors.primary, fontWeight: FontWeight.bold),
                             ),
                           ),
                           Expanded(
@@ -782,44 +945,14 @@ class _TrafficViewState extends ConsumerState<TrafficView> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '↓ ${_formatSpeed(proc.rxRateBps)}',
-                                  style: TextStyle(
-                                    color: colors.green,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                Text(
-                                  '↑ ${_formatSpeed(proc.txRateBps)}',
-                                  style: TextStyle(
-                                    color: colors.secondary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                                Text('↓ ${_formatSpeed(proc.rxRateBps)}', style: TextStyle(color: colors.green, fontWeight: FontWeight.w600, fontSize: 12)),
+                                Text('↑ ${_formatSpeed(proc.txRateBps)}', style: TextStyle(color: colors.secondary, fontWeight: FontWeight.w600, fontSize: 12)),
                               ],
                             ),
                           ),
                           Expanded(
                             flex: 2,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  _formatBytes(totalProcBytes),
-                                  style: TextStyle(
-                                    color: colors.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  '↓ ${_formatBytes(proc.totalRxBytes)}',
-                                  style: TextStyle(color: colors.textMuted, fontSize: 11),
-                                ),
-                              ],
-                            ),
+                            child: Text(_formatBytes(totalProcBytes), textAlign: TextAlign.right, style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
                           ),
                         ],
                       ),

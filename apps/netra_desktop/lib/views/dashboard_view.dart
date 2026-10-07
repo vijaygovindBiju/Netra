@@ -12,7 +12,7 @@ class DashboardView extends ConsumerStatefulWidget {
 }
 
 class _DashboardViewState extends ConsumerState<DashboardView> {
-  final Set<AppCategoryType> _expandedCategories = {};
+  final Set<String> _expandedAppNames = {};
 
   String _formatSpeed(int bps) {
     if (bps < 1024) return '$bps B/s';
@@ -27,12 +27,12 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
-  void _toggleCategory(AppCategoryType type) {
+  void _toggleApp(String appName) {
     setState(() {
-      if (_expandedCategories.contains(type)) {
-        _expandedCategories.remove(type);
+      if (_expandedAppNames.contains(appName)) {
+        _expandedAppNames.remove(appName);
       } else {
-        _expandedCategories.add(type);
+        _expandedAppNames.add(appName);
       }
     });
   }
@@ -48,9 +48,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final rxSpeed = _formatSpeed(metrics?.rxRateBps ?? 0);
     final txSpeed = _formatSpeed(metrics?.txRateBps ?? 0);
 
-    // Group processes by category
-    final appGroups = AppCategorizer.groupProcesses(trafficState.processes);
-    final topGroups = appGroups.take(4).toList();
+    // Group processes by same application name
+    final namedAppGroups = AppCategorizer.groupByAppName(trafficState.processes);
+    final topApps = namedAppGroups.take(5).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -164,7 +164,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
 
           const SizedBox(height: 20),
 
-          // 2. Middle Section: Application Data Usage (Collapsible Categories) & Interface Details
+          // 2. Middle Section: Application Data Usage (Grouped by Same Name) & Interface Details
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -208,7 +208,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      if (topGroups.isEmpty)
+                      if (topApps.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Center(
@@ -222,12 +222,12 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                         ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: topGroups.length,
+                          itemCount: topApps.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemBuilder: (context, idx) {
-                            final group = topGroups[idx];
-                            final isExpanded = _expandedCategories.contains(group.type);
-                            final groupTotalBytes = group.totalBytes;
+                            final app = topApps[idx];
+                            final isExpanded = _expandedAppNames.contains(app.appName.toLowerCase());
+                            final appTotalBytes = app.totalBytes;
 
                             return Container(
                               decoration: BoxDecoration(
@@ -235,16 +235,16 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: isExpanded
-                                      ? group.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
+                                      ? app.accentColor.withValues(alpha: colors.isDark ? 0.4 : 0.3)
                                       : colors.border,
                                 ),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Accordion Category Header
+                                  // Accordion App Header
                                   InkWell(
-                                    onTap: () => _toggleCategory(group.type),
+                                    onTap: () => _toggleApp(app.appName.toLowerCase()),
                                     borderRadius: BorderRadius.circular(10),
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -253,10 +253,10 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                           Container(
                                             padding: const EdgeInsets.all(7),
                                             decoration: BoxDecoration(
-                                              color: group.accentColor.withValues(alpha: 0.15),
+                                              color: app.accentColor.withValues(alpha: 0.15),
                                               borderRadius: BorderRadius.circular(8),
                                             ),
-                                            child: Icon(group.icon, color: group.accentColor, size: 16),
+                                            child: Icon(app.icon, color: app.accentColor, size: 16),
                                           ),
                                           const SizedBox(width: 10),
                                           Expanded(
@@ -264,7 +264,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                               children: [
                                                 Flexible(
                                                   child: Text(
-                                                    group.title,
+                                                    app.displayName,
                                                     style: TextStyle(
                                                       color: colors.textPrimary,
                                                       fontWeight: FontWeight.bold,
@@ -282,7 +282,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                                     border: Border.all(color: colors.border),
                                                   ),
                                                   child: Text(
-                                                    '${group.processes.length} apps',
+                                                    app.processCount == 1
+                                                        ? 'PID ${app.processes.first.pid}'
+                                                        : '${app.processCount} processes',
                                                     style: TextStyle(fontSize: 10, color: colors.textSecondary),
                                                   ),
                                                 ),
@@ -290,7 +292,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                             ),
                                           ),
                                           Text(
-                                            '↓ ${_formatSpeed(group.totalRxRate)}',
+                                            '↓ ${_formatSpeed(app.totalRxRate)}',
                                             style: TextStyle(
                                               color: colors.green,
                                               fontSize: 11,
@@ -301,13 +303,13 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: group.accentColor.withValues(alpha: 0.12),
+                                              color: app.accentColor.withValues(alpha: 0.12),
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Text(
-                                              _formatBytes(groupTotalBytes),
+                                              _formatBytes(appTotalBytes),
                                               style: TextStyle(
-                                                color: group.accentColor,
+                                                color: app.accentColor,
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 11,
                                               ),
@@ -328,16 +330,16 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                     ),
                                   ),
 
-                                  // Expanded Apps Subtable
+                                  // Expanded Workers Subtable (When Collapsible Tile is Opened)
                                   if (isExpanded) ...[
                                     Divider(color: colors.border, height: 1),
                                     Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                       child: Column(
-                                        children: group.processes.map((proc) {
+                                        children: app.processes.map((proc) {
                                           final pTotal = proc.totalRxBytes + proc.totalTxBytes;
-                                          final ratio = groupTotalBytes > 0
-                                              ? (pTotal / groupTotalBytes).clamp(0.05, 1.0)
+                                          final ratio = appTotalBytes > 0
+                                              ? (pTotal / appTotalBytes).clamp(0.05, 1.0)
                                               : 0.05;
 
                                           return Padding(
@@ -349,7 +351,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                                   children: [
                                                     Expanded(
                                                       child: Text(
-                                                        '${proc.name} (PID ${proc.pid})',
+                                                        'PID ${proc.pid} (${proc.openSocketCount} sockets)',
                                                         style: TextStyle(
                                                           color: colors.textPrimary,
                                                           fontSize: 12,
@@ -380,7 +382,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                                     value: ratio,
                                                     minHeight: 2.5,
                                                     backgroundColor: colors.border,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(group.accentColor),
+                                                    valueColor: AlwaysStoppedAnimation<Color>(app.accentColor),
                                                   ),
                                                 ),
                                               ],

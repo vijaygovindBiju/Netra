@@ -249,4 +249,71 @@ class AppCategorizer {
     groups.sort((a, b) => b.totalBytes.compareTo(a.totalBytes));
     return groups;
   }
+
+  static List<NamedAppGroup> groupByAppName(List<ProcessTrafficItem> processes) {
+    final Map<String, List<ProcessTrafficItem>> map = {};
+
+    for (final p in processes) {
+      String name = p.name.trim();
+      if (name.isEmpty) name = 'Unknown';
+      final key = name.toLowerCase();
+      map.putIfAbsent(key, () => []).add(p);
+    }
+
+    final List<NamedAppGroup> groups = [];
+    for (final entry in map.entries) {
+      final procs = entry.value;
+      procs.sort((a, b) =>
+          (b.totalRxBytes + b.totalTxBytes).compareTo(a.totalRxBytes + a.totalTxBytes));
+
+      final sample = procs.first;
+      final cat = categorize(sample);
+      final meta = categoryMeta[cat]!;
+
+      final rawName = sample.name;
+      final displayName = rawName.length > 1
+          ? '${rawName[0].toUpperCase()}${rawName.substring(1)}'
+          : rawName.toUpperCase();
+
+      groups.add(
+        NamedAppGroup(
+          appName: sample.name,
+          displayName: displayName,
+          category: cat,
+          icon: meta.icon,
+          accentColor: meta.accentColor,
+          processes: procs,
+        ),
+      );
+    }
+
+    // Sort by total combined data descending
+    groups.sort((a, b) => b.totalBytes.compareTo(a.totalBytes));
+    return groups;
+  }
 }
+
+class NamedAppGroup {
+  final String appName;
+  final String displayName;
+  final AppCategoryType category;
+  final IconData icon;
+  final Color accentColor;
+  final List<ProcessTrafficItem> processes;
+
+  NamedAppGroup({
+    required this.appName,
+    required this.displayName,
+    required this.category,
+    required this.icon,
+    required this.accentColor,
+    required this.processes,
+  });
+
+  int get processCount => processes.length;
+  int get totalRxRate => processes.fold(0, (sum, p) => sum + p.rxRateBps);
+  int get totalTxRate => processes.fold(0, (sum, p) => sum + p.txRateBps);
+  int get totalBytes => processes.fold(0, (sum, p) => sum + p.totalRxBytes + p.totalTxBytes);
+  int get totalSockets => processes.fold(0, (sum, p) => sum + p.openSocketCount);
+}
+
