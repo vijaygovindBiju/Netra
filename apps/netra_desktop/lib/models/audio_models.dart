@@ -4,6 +4,7 @@ class AudioSinkItem {
   final String description;
   final int volumePercent;
   final bool isMuted;
+  final bool isDefault;
   final bool isBluetooth;
   final bool isVirtual;
   final int latencyOffsetMs;
@@ -14,6 +15,7 @@ class AudioSinkItem {
     required this.description,
     required this.volumePercent,
     required this.isMuted,
+    this.isDefault = false,
     required this.isBluetooth,
     required this.isVirtual,
     required this.latencyOffsetMs,
@@ -26,6 +28,7 @@ class AudioSinkItem {
       description: json['description'] ?? '',
       volumePercent: (json['volume_percent'] as num?)?.toInt() ?? 100,
       isMuted: json['is_muted'] ?? false,
+      isDefault: json['is_default'] ?? false,
       isBluetooth: json['is_bluetooth'] ?? false,
       isVirtual: json['is_virtual'] ?? false,
       latencyOffsetMs: (json['latency_offset_ms'] as num?)?.toInt() ?? 0,

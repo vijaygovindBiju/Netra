@@ -29,6 +29,13 @@ class BluetoothView extends ConsumerWidget {
     final colors = NetraColors.of(context);
     final btState = ref.watch(bluetoothStateProvider);
     final notifier = ref.read(bluetoothStateProvider.notifier);
+    final audioState = ref.watch(audioStateProvider);
+    final audioNotifier = ref.read(audioStateProvider.notifier);
+
+    // Detect Bluetooth audio output endpoints
+    final btAudioSinks = audioState.sinks.where((s) => s.isBluetooth && !s.isVirtual).toList();
+    final activeDualAudioSink = audioState.sinks.where((s) => s.isVirtual && s.name.contains('NetraGroup_')).firstOrNull;
+    final isDualAudioActive = activeDualAudioSink != null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -51,7 +58,7 @@ class BluetoothView extends ConsumerWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Pair, manage devices, monitor battery levels, and configure multi-device links',
+                    'Pair, manage devices, monitor battery levels, and stream dual-headphone audio',
                     style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
@@ -90,7 +97,233 @@ class BluetoothView extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
-          // Connected & Paired Devices Section
+          // 1. Dual Bluetooth Audio Streamer Panel
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDualAudioActive
+                    ? [colors.green.withValues(alpha: 0.14), colors.primary.withValues(alpha: 0.08)]
+                    : [colors.surfaceCard, colors.surface],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isDualAudioActive
+                    ? colors.green.withValues(alpha: 0.45)
+                    : colors.border,
+                width: isDualAudioActive ? 1.5 : 1.0,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (isDualAudioActive ? colors.green : colors.primary).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.headphones,
+                        color: isDualAudioActive ? colors.green : colors.primary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Dual Bluetooth Audio Streaming',
+                                style: TextStyle(
+                                  color: colors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: (isDualAudioActive ? colors.green : colors.secondary).withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  isDualAudioActive ? 'STREAMING ACTIVE' : 'PIPEWIRE DUAL-SYNC',
+                                  style: TextStyle(
+                                    color: isDualAudioActive ? colors.green : colors.secondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            isDualAudioActive
+                                ? 'Synchronously broadcasting system audio to multiple Bluetooth headphones via PipeWire'
+                                : (btAudioSinks.length >= 2
+                                    ? '${btAudioSinks.length} Bluetooth audio devices ready for synchronized simultaneous streaming'
+                                    : (btAudioSinks.length == 1
+                                        ? '1 Bluetooth audio device connected. Connect a 2nd pair to broadcast audio together.'
+                                        : 'Connect 2 Bluetooth headphones/earbuds to stream audio simultaneously with zero echo.')),
+                            style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    if (isDualAudioActive) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => audioNotifier.destroyDualAudio('Dual Bluetooth'),
+                        icon: const Icon(Icons.stop, size: 16, color: Colors.white),
+                        label: const Text('Stop Dual Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colors.red,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                    ] else if (btAudioSinks.length >= 2) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => audioNotifier.createDualAudio('Dual Bluetooth', btAudioSinks.map((s) => s.name).toList()),
+                        icon: const Icon(Icons.play_arrow, size: 16, color: Colors.white),
+                        label: const Text('Start Dual Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colors.green,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                    ] else ...[
+                      OutlinedButton.icon(
+                        onPressed: () => ref.read(activeTabProvider.notifier).state = 5,
+                        icon: const Icon(Icons.tune, size: 15),
+                        label: const Text('Audio Orchestrator', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colors.primary,
+                          side: BorderSide(color: colors.border),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Connected Audio Headphone Devices Chips
+                if (btAudioSinks.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: btAudioSinks.map((sink) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isDualAudioActive ? colors.green.withValues(alpha: 0.3) : colors.border,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.headphones, size: 14, color: isDualAudioActive ? colors.green : colors.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              sink.description.isNotEmpty ? sink.description : sink.name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${sink.volumePercent}%',
+                              style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
+                // Active Dual Streaming Controls (Volume & Latency compensation)
+                if (isDualAudioActive && activeDualAudioSink != null) ...[
+                  const SizedBox(height: 14),
+                  Divider(color: colors.border, height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      // Combined Master Volume
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Master Stream Volume', style: TextStyle(fontSize: 12, color: colors.textSecondary, fontWeight: FontWeight.w500)),
+                                Text('${activeDualAudioSink.volumePercent}%', style: TextStyle(fontSize: 12, color: colors.primary, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Slider(
+                              value: activeDualAudioSink.volumePercent.toDouble().clamp(0.0, 100.0),
+                              min: 0,
+                              max: 100,
+                              activeColor: colors.primary,
+                              inactiveColor: colors.surface,
+                              onChanged: (val) => audioNotifier.setVolume(activeDualAudioSink.id, val.toInt()),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      // Latency Sync Offset
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('Acoustic Sync Delay / Offset', style: TextStyle(fontSize: 12, color: colors.textSecondary, fontWeight: FontWeight.w500)),
+                                Text('${activeDualAudioSink.latencyOffsetMs} ms', style: TextStyle(fontSize: 12, color: colors.secondary, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                            Slider(
+                              value: activeDualAudioSink.latencyOffsetMs.toDouble().clamp(-100.0, 150.0),
+                              min: -100,
+                              max: 150,
+                              activeColor: colors.secondary,
+                              inactiveColor: colors.surface,
+                              onChanged: (val) => audioNotifier.setLatencyOffset(activeDualAudioSink.id, val.toInt()),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 2. Connected & Paired Devices Section
           ResizableCard(
             title: 'Bluetooth Devices (${btState.devices.length})',
             icon: Icons.bluetooth,

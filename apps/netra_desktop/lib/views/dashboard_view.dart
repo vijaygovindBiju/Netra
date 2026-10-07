@@ -129,6 +129,11 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final netState = ref.watch(networkStateProvider);
     final hsState = ref.watch(hotspotStateProvider);
     final trafficState = ref.watch(trafficStateProvider);
+    final audioState = ref.watch(audioStateProvider);
+
+    final activeDualAudioSink = audioState.sinks.where((s) => s.isVirtual && s.name.contains('NetraGroup_')).firstOrNull;
+    final isDualAudioActive = activeDualAudioSink != null;
+    final btAudioSinks = audioState.sinks.where((s) => s.isBluetooth && !s.isVirtual).toList();
 
     final metrics = netState.currentMetrics;
     final rxSpeed = _formatSpeed(metrics?.rxRateBps ?? 0);
@@ -268,6 +273,76 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               ),
             ),
           ],
+          if (isDualAudioActive) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colors.green.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.headphones, color: colors.green, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Dual Bluetooth Audio Active • Synchronously streaming audio to multiple headphones',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.read(activeTabProvider.notifier).state = 3,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.green,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Manage in Bluetooth Tab', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ] else if (btAudioSinks.length >= 2) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colors.primary.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.headphones, color: colors.primary, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${btAudioSinks.length} Bluetooth Headphones Connected • Ready for simultaneous Dual Audio streaming',
+                      style: TextStyle(
+                        color: colors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.read(activeTabProvider.notifier).state = 3,
+                    style: TextButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text('Start Dual Stream', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           const SizedBox(height: 20),
 
           // 1. Top Metrics Cards (Uniform Row Layout)

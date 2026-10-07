@@ -7,6 +7,7 @@ use tracing::{error, info};
 pub struct PipeWireAudioEngine {
     // Maps group_name to loaded module ID
     active_multi_sinks: HashMap<String, u32>,
+    previous_default_sink: Option<String>,
     latency_offsets: HashMap<u32, i32>,
 }
 
@@ -14,12 +15,20 @@ impl PipeWireAudioEngine {
     pub fn new() -> Self {
         Self {
             active_multi_sinks: HashMap::new(),
+            previous_default_sink: None,
             latency_offsets: HashMap::new(),
         }
     }
 
     /// Queries all physical and virtual audio sinks available in PipeWire
     pub fn get_sinks(&self) -> Result<Vec<AudioSink>> {
+        let default_sink_name = Command::new("pactl")
+            .arg("get-default-sink")
+            .output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
         let output = Command::new("pactl")
             .args(["list", "sinks"])
             .output()
@@ -47,6 +56,7 @@ impl PipeWireAudioEngine {
                     let is_bt = current_name.contains("bluez") || current_desc.to_lowercase().contains("bluetooth");
                     let is_virt = current_name.contains("combine") || current_name.contains("Netra");
                     let offset = self.latency_offsets.get(&current_id).copied().unwrap_or(0);
+                    let is_def = !default_sink_name.is_empty() && current_name == default_sink_name;
 
                     sinks.push(AudioSink {
                         id: current_id,
@@ -54,7 +64,7 @@ impl PipeWireAudioEngine {
                         description: if current_desc.is_empty() { current_name.clone() } else { current_desc.clone() },
                         volume_percent: current_vol,
                         is_muted: current_mute,
-                        is_default: false,
+                        is_default: is_def,
                         is_bluetooth: is_bt,
                         is_virtual: is_virt,
                         latency_offset_ms: offset,
@@ -91,6 +101,7 @@ impl PipeWireAudioEngine {
             let is_bt = current_name.contains("bluez") || current_desc.to_lowercase().contains("bluetooth");
             let is_virt = current_name.contains("combine") || current_name.contains("Netra");
             let offset = self.latency_offsets.get(&current_id).copied().unwrap_or(0);
+            let is_def = !default_sink_name.is_empty() && current_name == default_sink_name;
 
             sinks.push(AudioSink {
                 id: current_id,
@@ -98,7 +109,7 @@ impl PipeWireAudioEngine {
                 description: if current_desc.is_empty() { current_name } else { current_desc },
                 volume_percent: current_vol,
                 is_muted: current_mute,
-                is_default: false,
+                is_default: is_def,
                 is_bluetooth: is_bt,
                 is_virtual: is_virt,
                 latency_offset_ms: offset,
@@ -266,9 +277,41 @@ impl PipeWireAudioEngine {
 
     /// Creates a synchronized virtual multi-sink that broadcasts audio across multiple physical sinks
     pub fn create_multi_sink(&mut self, group_name: &str, slave_names: &[String]) -> Result<u32> {
-        let slaves_arg = slave_names.join(",");
+        let mut target_slaves: Vec<String> = slave_names.to_vec();
+
+        // If no slaves explicitly provided, automatically gather all active Bluetooth audio sinks
+        if target_slaves.is_empty() {
+            if let Ok(sinks) = self.get_sinks() {
+                let bt_sinks: Vec<String> = sinks
+                    .into_iter()
+                    .filter(|s| !s.is_virtual && s.is_bluetooth)
+                    .map(|s| s.name)
+                    .collect();
+                if !bt_sinks.is_empty() {
+                    target_slaves = bt_sinks;
+                }
+            }
+        }
+
+        if target_slaves.is_empty() {
+            return Err(NetraError::DBus("No audio sinks available for multi-sink".into()));
+        }
+
+        // Store previous default sink before switching
+        if self.previous_default_sink.is_none() {
+            if let Ok(out) = Command::new("pactl").arg("get-default-sink").output() {
+                if out.status.success() {
+                    let cur = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    if !cur.is_empty() && !cur.contains("NetraGroup_") {
+                        self.previous_default_sink = Some(cur);
+                    }
+                }
+            }
+        }
+
+        let slaves_arg = target_slaves.join(",");
         let sink_name = format!("NetraGroup_{}", group_name.replace(' ', "_"));
-        let desc_arg = format!("Netra Multi-Audio ({})", group_name);
+        let desc_arg = format!("Netra Dual Audio ({})", group_name);
 
         info!("Creating PipeWire combine-sink '{}' with slaves: {}", sink_name, slaves_arg);
 
@@ -295,10 +338,24 @@ impl PipeWireAudioEngine {
         self.active_multi_sinks.insert(group_name.to_string(), module_id);
         info!("Multi-sink created with module ID: {}", module_id);
 
+        // Set as default sink so system sound streams to both devices immediately
+        let _ = Command::new("pactl")
+            .args(["set-default-sink", &sink_name])
+            .output();
+
+        // Move all active playback streams into the new combine-sink
+        if let Ok(streams) = self.get_streams() {
+            for s in streams {
+                let _ = Command::new("pactl")
+                    .args(["move-sink-input", &s.id.to_string(), &sink_name])
+                    .output();
+            }
+        }
+
         Ok(module_id)
     }
 
-    /// Tears down a virtual multi-sink group
+    /// Tears down a virtual multi-sink group and restores default sink
     pub fn destroy_multi_sink(&mut self, group_name: &str) -> Result<()> {
         if let Some(module_id) = self.active_multi_sinks.remove(group_name) {
             info!("Unloading multi-sink module ID: {}", module_id);
@@ -306,6 +363,35 @@ impl PipeWireAudioEngine {
                 .args(["unload-module", &module_id.to_string()])
                 .output();
         }
+
+        // Restore previous default sink if all multi sinks removed
+        if self.active_multi_sinks.is_empty() {
+            if let Some(prev) = self.previous_default_sink.take() {
+                info!("Restoring previous default audio sink: {}", prev);
+                let _ = Command::new("pactl")
+                    .args(["set-default-sink", &prev])
+                    .output();
+            }
+        }
+
         Ok(())
+    }
+
+    /// Tears down any residual Netra combine sinks
+    pub fn cleanup_all_multi_sinks(&mut self) {
+        if let Ok(out) = Command::new("pactl").args(["list", "modules", "short"]).output() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            for line in text.lines() {
+                if line.contains("NetraGroup_") {
+                    if let Some(mod_id) = line.split_whitespace().next() {
+                        let _ = Command::new("pactl").args(["unload-module", mod_id]).output();
+                    }
+                }
+            }
+        }
+        self.active_multi_sinks.clear();
+        if let Some(prev) = self.previous_default_sink.take() {
+            let _ = Command::new("pactl").args(["set-default-sink", &prev]).output();
+        }
     }
 }

@@ -25,6 +25,16 @@ class _AudioViewState extends ConsumerState<AudioView> {
   void _showCreateDualAudioDialog(BuildContext context, List<AudioSinkItem> sinks) {
     final colors = NetraColors.of(context);
 
+    // Pre-select Bluetooth sinks by default if none selected
+    if (_selectedMultiSinkSlaves.isEmpty) {
+      final btSinks = sinks.where((s) => !s.isVirtual && s.isBluetooth).toList();
+      if (btSinks.isNotEmpty) {
+        for (final s in btSinks) {
+          _selectedMultiSinkSlaves.add(s.name);
+        }
+      }
+    }
+
     showDialog(
       context: context,
       builder: (ctx) {
@@ -72,9 +82,18 @@ class _AudioViewState extends ConsumerState<AudioView> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Text(
-                      'Select Target Sinks to Sync:',
-                      style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Select Target Sinks to Sync:',
+                          style: TextStyle(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          '${_selectedMultiSinkSlaves.length} Selected',
+                          style: TextStyle(color: colors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -96,6 +115,11 @@ class _AudioViewState extends ConsumerState<AudioView> {
                             value: isSelected,
                             activeColor: colors.primary,
                             checkColor: Colors.white,
+                            secondary: Icon(
+                              sink.isBluetooth ? Icons.bluetooth_audio : Icons.speaker,
+                              color: sink.isBluetooth ? colors.primary : colors.textSecondary,
+                              size: 18,
+                            ),
                             title: Text(
                               sink.description.isNotEmpty ? sink.description : sink.name,
                               style: TextStyle(color: colors.textPrimary, fontSize: 13),
@@ -153,6 +177,11 @@ class _AudioViewState extends ConsumerState<AudioView> {
     final audioState = ref.watch(audioStateProvider);
     final notifier = ref.read(audioStateProvider.notifier);
 
+    // Bluetooth Audio Endpoints & Virtual Master
+    final btAudioSinks = audioState.sinks.where((s) => s.isBluetooth && !s.isVirtual).toList();
+    final activeDualAudioSink = audioState.sinks.where((s) => s.isVirtual && s.name.contains('NetraGroup_')).firstOrNull;
+    final isDualAudioActive = activeDualAudioSink != null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
@@ -183,7 +212,7 @@ class _AudioViewState extends ConsumerState<AudioView> {
                 onPressed: () => _showCreateDualAudioDialog(context, audioState.sinks),
                 icon: const Icon(Icons.group_work, size: 16, color: Colors.white),
                 label: const Text(
-                  'Create Multi-Device Sync',
+                  'Custom Multi-Sync',
                   style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -194,6 +223,122 @@ class _AudioViewState extends ConsumerState<AudioView> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 20),
+
+          // 1-Click Dual Bluetooth Audio Quick Banner
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDualAudioActive
+                    ? [colors.green.withValues(alpha: 0.15), colors.primary.withValues(alpha: 0.08)]
+                    : [colors.surfaceCard, colors.surface],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDualAudioActive ? colors.green.withValues(alpha: 0.45) : colors.border,
+                width: isDualAudioActive ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: (isDualAudioActive ? colors.green : colors.primary).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.headphones,
+                    color: isDualAudioActive ? colors.green : colors.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Dual Bluetooth Headphones Sync',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.textPrimary),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: (isDualAudioActive ? colors.green : colors.secondary).withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isDualAudioActive ? 'BROADCASTING' : 'READY',
+                              style: TextStyle(
+                                color: isDualAudioActive ? colors.green : colors.secondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isDualAudioActive
+                            ? 'All application playback is currently streamed synchronously to dual audio endpoints'
+                            : (btAudioSinks.length >= 2
+                                ? 'Detected ${btAudioSinks.length} Bluetooth headphones: ${btAudioSinks.map((s) => s.description).join(" & ")}'
+                                : (btAudioSinks.length == 1
+                                    ? '1 Bluetooth headphone connected (${btAudioSinks.first.description}). Connect a 2nd pair in Bluetooth tab to sync.'
+                                    : 'Connect 2 Bluetooth headphones/earbuds to stream audio simultaneously.')),
+                        style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (isDualAudioActive) ...[
+                  ElevatedButton.icon(
+                    onPressed: () => notifier.destroyDualAudio('Dual Bluetooth'),
+                    icon: const Icon(Icons.stop, size: 16, color: Colors.white),
+                    label: const Text('Stop Dual Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.red,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ] else if (btAudioSinks.length >= 2) ...[
+                  ElevatedButton.icon(
+                    onPressed: () => notifier.createDualAudio('Dual Bluetooth', btAudioSinks.map((s) => s.name).toList()),
+                    icon: const Icon(Icons.play_arrow, size: 16, color: Colors.white),
+                    label: const Text('Sync Both Headphones', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.green,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    onPressed: () => ref.read(activeTabProvider.notifier).state = 3,
+                    icon: const Icon(Icons.bluetooth, size: 15),
+                    label: const Text('Bluetooth Center', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.primary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
           const SizedBox(height: 20),
 
@@ -339,6 +484,18 @@ class _AudioViewState extends ConsumerState<AudioView> {
                                 ),
                               ),
                             ),
+                            if (sink.isDefault) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: colors.green.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text('DEFAULT OUTPUT',
+                                    style: TextStyle(fontSize: 9, color: colors.green, fontWeight: FontWeight.bold)),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
                             if (sink.isVirtual) ...[
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -349,7 +506,16 @@ class _AudioViewState extends ConsumerState<AudioView> {
                                 child: Text('MULTI-AUDIO MASTER',
                                     style: TextStyle(fontSize: 9, color: colors.primary, fontWeight: FontWeight.bold)),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                tooltip: 'Stop and remove multi-sync group',
+                                icon: Icon(Icons.delete_outline, size: 18, color: colors.red),
+                                onPressed: () {
+                                  final groupName = sink.name.replaceFirst('NetraGroup_', '').replaceAll('_', ' ');
+                                  notifier.destroyDualAudio(groupName);
+                                },
+                              ),
+                              const SizedBox(width: 4),
                             ],
                             Text('${sink.volumePercent}%',
                                 style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
