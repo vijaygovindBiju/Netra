@@ -64,4 +64,12 @@ pub struct BluetoothAdapterInfo {
     pub is_powered: bool,
     pub is_discovering: bool,
     pub is_pairable: bool,
+    pub manufacturer: String,
+    pub chipset_name: String,
+    pub bluetooth_version: String,
+    pub hci_version: u8,
+    pub max_active_connections: u8,
+    pub max_recommended_audio_streams: u8,
+    pub supports_le_audio: bool,
+    pub supports_2m_phy: bool,
 }

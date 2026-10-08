@@ -357,7 +357,10 @@ impl PipeWireAudioEngine {
 
     /// Tears down a virtual multi-sink group and restores default sink
     pub fn destroy_multi_sink(&mut self, group_name: &str) -> Result<()> {
-        if let Some(module_id) = self.active_multi_sinks.remove(group_name) {
+        let target_module = self.active_multi_sinks.remove(group_name)
+            .or_else(|| self.active_multi_sinks.drain().next().map(|(_, v)| v));
+
+        if let Some(module_id) = target_module {
             info!("Unloading multi-sink module ID: {}", module_id);
             let _ = Command::new("pactl")
                 .args(["unload-module", &module_id.to_string()])

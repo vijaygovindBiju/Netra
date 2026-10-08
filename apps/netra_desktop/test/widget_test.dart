@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:netra_desktop/main.dart';
+import 'package:netra_desktop/models/bluetooth_models.dart';
 
 void main() {
   testWidgets('NetraApp smoke test and theme toggle', (WidgetTester tester) async {
@@ -92,5 +93,33 @@ void main() {
 
     // Hidden Cards bar should disappear
     expect(find.text('Hidden Cards:'), findsNothing);
+  });
+
+  test('BluetoothAdapterItem parses hardware capabilities and limits accurately', () {
+    final rawJson = {
+      'address': '00:11:22:33:44:55',
+      'name': 'My Laptop BT',
+      'is_powered': true,
+      'is_discovering': false,
+      'is_pairable': true,
+      'manufacturer': 'MediaTek',
+      'chipset_name': 'MediaTek Bluetooth MT7921',
+      'bluetooth_version': '5.3',
+      'hci_version': 12,
+      'max_active_connections': 7,
+      'max_recommended_audio_streams': 3,
+      'supports_le_audio': true,
+      'supports_2m_phy': true,
+    };
+
+    final adapter = BluetoothAdapterItem.fromJson(rawJson);
+    expect(adapter.address, '00:11:22:33:44:55');
+    expect(adapter.chipsetName, 'MediaTek Bluetooth MT7921');
+    expect(adapter.bluetoothVersion, '5.3');
+    expect(adapter.hciVersion, 12);
+    expect(adapter.maxActiveConnections, 7);
+    expect(adapter.maxRecommendedAudioStreams, 3);
+    expect(adapter.supportsLeAudio, isTrue);
+    expect(adapter.supports2mPhy, isTrue);
   });
 }

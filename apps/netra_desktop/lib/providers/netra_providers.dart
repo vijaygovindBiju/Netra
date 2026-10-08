@@ -285,22 +285,26 @@ final hotspotStateProvider = StateNotifierProvider<HotspotNotifier, HotspotState
 class BluetoothState {
   final bool isScanning;
   final List<BluetoothDeviceItem> devices;
+  final BluetoothAdapterItem? adapter;
   final String? error;
 
   BluetoothState({
     this.isScanning = false,
     this.devices = const [],
+    this.adapter,
     this.error,
   });
 
   BluetoothState copyWith({
     bool? isScanning,
     List<BluetoothDeviceItem>? devices,
+    BluetoothAdapterItem? adapter,
     String? error,
   }) {
     return BluetoothState(
       isScanning: isScanning ?? this.isScanning,
       devices: devices ?? this.devices,
+      adapter: adapter ?? this.adapter,
       error: error,
     );
   }
@@ -312,7 +316,20 @@ class BluetoothNotifier extends StateNotifier<BluetoothState> {
 
   BluetoothNotifier(this._service) : super(BluetoothState()) {
     refreshDevices();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => refreshDevices());
+    refreshAdapter();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      refreshDevices();
+      refreshAdapter();
+    });
+  }
+
+  Future<void> refreshAdapter() async {
+    try {
+      final adapter = await _service.getBluetoothAdapterInfo();
+      if (adapter != null) {
+        state = state.copyWith(adapter: adapter);
+      }
+    } catch (_) {}
   }
 
   Future<void> refreshDevices() async {

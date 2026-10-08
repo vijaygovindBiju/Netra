@@ -188,6 +188,19 @@ class NetraDbusService {
     return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
   }
 
+  Future<BluetoothAdapterItem?> getBluetoothAdapterInfo() async {
+    try {
+      final res = await _getObj('/org/netra/Bluetooth').callMethod('org.netra.Bluetooth', 'GetAdapterInfoJson', []);
+      if (res.values.isNotEmpty && res.values[0] is DBusString) {
+        final raw = (res.values[0] as DBusString).value;
+        return BluetoothAdapterItem.fromJson(jsonDecode(raw));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<BluetoothDeviceItem>> getBluetoothDevices() async {
     try {
       final res = await _getObj('/org/netra/Bluetooth').callMethod('org.netra.Bluetooth', 'GetDevicesJson', []);

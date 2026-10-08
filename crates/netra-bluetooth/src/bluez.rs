@@ -56,6 +56,111 @@ fn get_u8_prop(props: &HashMap<String, OwnedValue>, key: &str) -> Option<u8> {
     None
 }
 
+fn map_manufacturer(id: u16) -> &'static str {
+    match id {
+        0 => "Ericsson",
+        2 => "Intel",
+        10 => "Qualcomm",
+        13 => "Texas Instruments",
+        15 => "Broadcom",
+        29 => "Qualcomm / Atheros",
+        48 => "Realtek",
+        70 => "MediaTek",
+        76 => "Apple",
+        131 => "Qualcomm (CSR)",
+        224 => "Nordic Semiconductor",
+        _ => "Unknown Manufacturer",
+    }
+}
+
+fn map_bluetooth_version(hci_version: u8) -> &'static str {
+    match hci_version {
+        0 => "1.0b",
+        1 => "1.1",
+        2 => "1.2",
+        3 => "2.0 + EDR",
+        4 => "2.1 + EDR",
+        5 => "3.0 + HS",
+        6 => "4.0",
+        7 => "4.1",
+        8 => "4.2",
+        9 => "5.0",
+        10 => "5.1",
+        11 => "5.2",
+        12 => "5.3",
+        13 => "5.4",
+        14 => "6.0",
+        _ if hci_version > 14 => "6.0+",
+        _ => "Legacy",
+    }
+}
+
+fn detect_chipset_name(manufacturer: &str, hci_version: u8) -> String {
+    if let Ok(entries) = std::fs::read_dir("/sys/class/bluetooth") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let device_path = path.join("device");
+            let candidates = [device_path.join(".."), device_path];
+            for cand in candidates {
+                let v_file = cand.join("idVendor");
+                let p_file = cand.join("idProduct");
+                if let (Ok(v), Ok(p)) = (std::fs::read_to_string(&v_file), std::fs::read_to_string(&p_file)) {
+                    let vendor = v.trim().to_lowercase();
+                    let product = p.trim().to_lowercase();
+
+                    for ids_path in ["/usr/share/hwdata/usb.ids", "/var/lib/usbutils/usb.ids"] {
+                        if let Ok(content) = std::fs::read_to_string(ids_path) {
+                            let mut in_vendor = false;
+                            for line in content.lines() {
+                                if line.starts_with(&vendor) {
+                                    in_vendor = true;
+                                    continue;
+                                } else if in_vendor {
+                                    if line.starts_with("\t\t") {
+                                        continue;
+                                    }
+                                    if line.starts_with('\t') {
+                                        let trimmed = line.trim_start_matches('\t');
+                                        if let Some((prod_id, prod_name)) = trimmed.split_once("  ") {
+                                            if prod_id.trim().eq_ignore_ascii_case(&product) {
+                                                return prod_name.trim().to_string();
+                                            }
+                                        }
+                                    } else if !line.starts_with('#') {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    let matched = match (vendor.as_str(), product.as_str()) {
+                        ("04ca", "3802") | ("0e8d", "0608") => "MediaTek MT7921",
+                        ("0e8d", "0616") => "MediaTek MT7922",
+                        ("8087", "0026") => "Intel Wi-Fi 6 AX200 / AX201",
+                        ("8087", "0032") => "Intel Wi-Fi 6E AX210",
+                        ("8087", "0033") => "Intel Wi-Fi 6E AX211",
+                        ("8087", "0036") => "Intel Wi-Fi 7 BE200",
+                        ("0bda", "b852") => "Realtek RTL8852AE",
+                        ("0bda", "c852") => "Realtek RTL8852BE",
+                        _ => "",
+                    };
+                    if !matched.is_empty() {
+                        return matched.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    if manufacturer != "Unknown Manufacturer" && !manufacturer.is_empty() {
+        format!("{manufacturer} Bluetooth Adapter (BT {})", map_bluetooth_version(hci_version))
+    } else {
+        format!("Generic Bluetooth Adapter (BT {})", map_bluetooth_version(hci_version))
+    }
+}
+
+
 pub struct BluezClient {
     connection: Connection,
     primary_adapter_path: Option<OwnedObjectPath>,
@@ -121,12 +226,44 @@ impl BluezClient {
         let is_discovering: bool = proxy.get_property("Discovering").await.unwrap_or(false);
         let is_pairable: bool = proxy.get_property("Pairable").await.unwrap_or(false);
 
+        let hci_version: u8 = proxy.get_property("Version").await.unwrap_or(9);
+        let manufacturer_id: u16 = proxy.get_property("Manufacturer").await.unwrap_or(0);
+        let manufacturer = map_manufacturer(manufacturer_id).to_string();
+        let bluetooth_version = map_bluetooth_version(hci_version).to_string();
+        let chipset_name = detect_chipset_name(&manufacturer, hci_version);
+
+        // Standard Bluetooth Central/Master Piconet physical capacity is 7 concurrent active links
+        let max_active_connections = 7u8;
+
+        // Calculate practical audio streaming capacity before radio time-slicing packet loss
+        let max_recommended_audio_streams = if hci_version >= 11 {
+            // Bluetooth 5.2, 5.3, 5.4 with 2M PHY & LE Audio
+            3u8
+        } else if hci_version >= 9 {
+            // Bluetooth 5.0, 5.1
+            2u8
+        } else {
+            // Bluetooth 4.x
+            2u8
+        };
+
+        let supports_le_audio = hci_version >= 11;
+        let supports_2m_phy = hci_version >= 9;
+
         Ok(BluetoothAdapterInfo {
             address,
             name,
             is_powered,
             is_discovering,
             is_pairable,
+            manufacturer,
+            chipset_name,
+            bluetooth_version,
+            hci_version,
+            max_active_connections,
+            max_recommended_audio_streams,
+            supports_le_audio,
+            supports_2m_phy,
         })
     }
 

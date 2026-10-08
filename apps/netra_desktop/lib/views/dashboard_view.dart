@@ -774,7 +774,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
                                                       ],
                                                     ),
                                                   );
-                                                }).toList(),
+                                                }),
                                               ],
                                             ),
                                           ),

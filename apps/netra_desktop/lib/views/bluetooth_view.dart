@@ -31,6 +31,9 @@ class BluetoothView extends ConsumerWidget {
     final notifier = ref.read(bluetoothStateProvider.notifier);
     final audioState = ref.watch(audioStateProvider);
     final audioNotifier = ref.read(audioStateProvider.notifier);
+    final adapter = btState.adapter;
+    final maxRecommendedStreams = adapter?.maxRecommendedAudioStreams ?? 3;
+    final maxConnections = adapter?.maxActiveConnections ?? 7;
 
     // Detect Bluetooth audio output endpoints
     final btAudioSinks = audioState.sinks.where((s) => s.isBluetooth && !s.isVirtual).toList();
@@ -95,9 +98,139 @@ class BluetoothView extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
-          // 1. Dual Bluetooth Audio Streamer Panel
+          // 1. Hardware Bluetooth Controller & Multi-Stream Capacity Card
+          if (adapter != null) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colors.surfaceCard,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: colors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.memory, color: colors.primary, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  adapter.chipsetName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: colors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: colors.primary.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Bluetooth ${adapter.bluetoothVersion}',
+                                    style: TextStyle(
+                                      color: colors.primary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${adapter.manufacturer} • HCI Rev ${adapter.hciVersion} • MAC: ${adapter.address}',
+                              style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Real-time Hardware Stream Capacity Indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: colors.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: colors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.headphones,
+                                  size: 14,
+                                  color: btAudioSinks.length > maxRecommendedStreams ? colors.amber : colors.green,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  'Max Audio: $maxRecommendedStreams Streams',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: btAudioSinks.length > maxRecommendedStreams ? colors.amber : colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Piconet ACL Limit: $maxConnections Devices',
+                              style: TextStyle(fontSize: 11, color: colors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(color: colors.border, height: 1),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildHwFeatureBadge('2M PHY (High Bandwidth)', adapter.supports2mPhy, colors, '500+ kbps packet throughput'),
+                      const SizedBox(width: 8),
+                      _buildHwFeatureBadge('LE Audio / LC3 Ready', adapter.supportsLeAudio, colors, 'Isochronous audio broadcasting'),
+                      const SizedBox(width: 8),
+                      _buildHwFeatureBadge('Controller Powered', adapter.isPowered, colors, 'Hardware radio online'),
+                      const Spacer(),
+                      Text(
+                        'Active Audio Sinks: ${btAudioSinks.length} / $maxRecommendedStreams capacity',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: btAudioSinks.length > maxRecommendedStreams ? colors.amber : colors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // 2. Multi-Headphone Audio Streamer Panel
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
@@ -141,7 +274,7 @@ class BluetoothView extends ConsumerWidget {
                           Row(
                             children: [
                               Text(
-                                'Dual Bluetooth Audio Streaming',
+                                'Multi-Headphone Audio Streaming',
                                 style: TextStyle(
                                   color: colors.textPrimary,
                                   fontWeight: FontWeight.bold,
@@ -156,7 +289,9 @@ class BluetoothView extends ConsumerWidget {
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
-                                  isDualAudioActive ? 'STREAMING ACTIVE' : 'PIPEWIRE DUAL-SYNC',
+                                  isDualAudioActive
+                                      ? 'BROADCASTING TO ${btAudioSinks.length} HEADPHONES'
+                                      : 'PIPEWIRE MULTI-SYNC (UP TO $maxRecommendedStreams)',
                                   style: TextStyle(
                                     color: isDualAudioActive ? colors.green : colors.secondary,
                                     fontSize: 10,
@@ -169,12 +304,12 @@ class BluetoothView extends ConsumerWidget {
                           const SizedBox(height: 3),
                           Text(
                             isDualAudioActive
-                                ? 'Synchronously broadcasting system audio to multiple Bluetooth headphones via PipeWire'
+                                ? 'Synchronously broadcasting system audio to multiple Bluetooth headphones via PipeWire combined sink'
                                 : (btAudioSinks.length >= 2
-                                    ? '${btAudioSinks.length} Bluetooth audio devices ready for synchronized simultaneous streaming'
+                                    ? '${btAudioSinks.length} Bluetooth headphones ready (Hardware capacity: up to $maxRecommendedStreams simultaneously)'
                                     : (btAudioSinks.length == 1
-                                        ? '1 Bluetooth audio device connected. Connect a 2nd pair to broadcast audio together.'
-                                        : 'Connect 2 Bluetooth headphones/earbuds to stream audio simultaneously with zero echo.')),
+                                        ? '1 Bluetooth headphone connected. Connect additional pairs to stream to up to $maxRecommendedStreams simultaneously.'
+                                        : 'Connect 2 or more Bluetooth headphones to stream audio simultaneously with zero echo.')),
                             style: TextStyle(color: colors.textSecondary, fontSize: 12),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -186,7 +321,7 @@ class BluetoothView extends ConsumerWidget {
                       ElevatedButton.icon(
                         onPressed: () => audioNotifier.destroyDualAudio('Dual Bluetooth'),
                         icon: const Icon(Icons.stop, size: 16, color: Colors.white),
-                        label: const Text('Stop Dual Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        label: const Text('Stop Multi-Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.red,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -197,7 +332,7 @@ class BluetoothView extends ConsumerWidget {
                       ElevatedButton.icon(
                         onPressed: () => audioNotifier.createDualAudio('Dual Bluetooth', btAudioSinks.map((s) => s.name).toList()),
                         icon: const Icon(Icons.play_arrow, size: 16, color: Colors.white),
-                        label: const Text('Start Dual Stream', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        label: Text('Sync All ${btAudioSinks.length} Headphones', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colors.green,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -219,6 +354,32 @@ class BluetoothView extends ConsumerWidget {
                     ],
                   ],
                 ),
+
+                // Bandwidth Warning if sinks exceed recommended capacity
+                if (btAudioSinks.length > maxRecommendedStreams) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: colors.amber.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, size: 16, color: colors.amber),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Bandwidth Capacity Notice: Controller recommends up to $maxRecommendedStreams concurrent audio streams. '
+                            'Streaming to ${btAudioSinks.length} headphones simultaneously may cause 2.4GHz RF packet drops or jitter.',
+                            style: TextStyle(fontSize: 11, color: colors.amber, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
 
                 // Connected Audio Headphone Devices Chips
                 if (btAudioSinks.isNotEmpty) ...[
@@ -262,7 +423,7 @@ class BluetoothView extends ConsumerWidget {
                 ],
 
                 // Active Dual Streaming Controls (Volume & Latency compensation)
-                if (isDualAudioActive && activeDualAudioSink != null) ...[
+                if (activeDualAudioSink != null) ...[
                   const SizedBox(height: 14),
                   Divider(color: colors.border, height: 1),
                   const SizedBox(height: 12),
@@ -480,4 +641,40 @@ class BluetoothView extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildHwFeatureBadge(String title, bool active, NetraPalette colors, String tooltip) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: active ? colors.green.withValues(alpha: 0.12) : colors.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: active ? colors.green.withValues(alpha: 0.3) : colors.border,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              active ? Icons.check_circle : Icons.remove_circle_outline,
+              size: 13,
+              color: active ? colors.green : colors.textMuted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: active ? colors.green : colors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
