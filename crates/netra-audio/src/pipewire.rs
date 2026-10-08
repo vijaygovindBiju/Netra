@@ -1,4 +1,4 @@
-use netra_common::models::audio::{AudioSink, AudioStream};
+use netra_common::models::audio::{AudioRecordStream, AudioSink, AudioSource, AudioStream};
 use netra_common::{NetraError, Result};
 use std::collections::HashMap;
 use std::process::Command;
@@ -210,6 +210,290 @@ impl PipeWireAudioEngine {
         }
 
         Ok(streams)
+    }
+
+    /// Queries all physical and virtual audio sources (microphones / inputs) in PipeWire
+    pub fn get_sources(&self) -> Result<Vec<AudioSource>> {
+        let default_source_name = Command::new("pactl")
+            .arg("get-default-source")
+            .output()
+            .ok()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default();
+
+        let output = Command::new("pactl")
+            .args(["list", "sources"])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            return Err(NetraError::DBus("Failed to list sources via pactl".into()));
+        }
+
+        let raw = String::from_utf8_lossy(&output.stdout);
+        let mut sources = Vec::new();
+
+        let mut current_id = 0u32;
+        let mut current_name = String::new();
+        let mut current_desc = String::new();
+        let mut current_vol = 100u8;
+        let mut current_mute = false;
+        let mut current_port = None;
+        let mut is_monitor = false;
+
+        for line in raw.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.starts_with("Source #") {
+                if current_id != 0 {
+                    let is_bt = current_name.contains("bluez") || current_desc.to_lowercase().contains("bluetooth");
+                    let is_def = !default_source_name.is_empty() && current_name == default_source_name;
+
+                    sources.push(AudioSource {
+                        id: current_id,
+                        name: current_name.clone(),
+                        description: if current_desc.is_empty() { current_name.clone() } else { current_desc.clone() },
+                        volume_percent: current_vol,
+                        is_muted: current_mute,
+                        is_default: is_def,
+                        is_bluetooth: is_bt,
+                        is_monitor,
+                        active_port: current_port.clone(),
+                    });
+                }
+
+                current_id = trimmed[8..].trim().parse().unwrap_or(0);
+                current_name.clear();
+                current_desc.clear();
+                current_vol = 100;
+                current_mute = false;
+                current_port = None;
+                is_monitor = false;
+            } else if trimmed.starts_with("Name: ") {
+                current_name = trimmed[6..].trim().to_string();
+                if current_name.ends_with(".monitor") {
+                    is_monitor = true;
+                }
+            } else if trimmed.starts_with("Description: ") {
+                current_desc = trimmed[13..].trim().to_string();
+            } else if trimmed.starts_with("Mute: ") {
+                current_mute = trimmed[6..].trim() == "yes";
+            } else if trimmed.starts_with("Volume: ") {
+                if let Some(pct_idx) = trimmed.find('%') {
+                    if let Some(slash_idx) = trimmed[..pct_idx].rfind('/') {
+                        let pct_str = trimmed[slash_idx + 1..pct_idx].trim();
+                        current_vol = pct_str.parse().unwrap_or(100);
+                    }
+                }
+            } else if trimmed.starts_with("Active Port: ") {
+                current_port = Some(trimmed[13..].trim().to_string());
+            } else if trimmed.starts_with("Monitor of Sink: ") {
+                if trimmed[17..].trim() != "n/a" {
+                    is_monitor = true;
+                }
+            }
+        }
+
+        if current_id != 0 {
+            let is_bt = current_name.contains("bluez") || current_desc.to_lowercase().contains("bluetooth");
+            let is_def = !default_source_name.is_empty() && current_name == default_source_name;
+
+            sources.push(AudioSource {
+                id: current_id,
+                name: current_name.clone(),
+                description: if current_desc.is_empty() { current_name } else { current_desc },
+                volume_percent: current_vol,
+                is_muted: current_mute,
+                is_default: is_def,
+                is_bluetooth: is_bt,
+                is_monitor,
+                active_port: current_port,
+            });
+        }
+
+        Ok(sources)
+    }
+
+    /// Queries active recording/capture streams from applications
+    pub fn get_record_streams(&self) -> Result<Vec<AudioRecordStream>> {
+        let output = Command::new("pactl")
+            .args(["list", "source-outputs"])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            return Ok(Vec::new());
+        }
+
+        let raw = String::from_utf8_lossy(&output.stdout);
+        let mut streams = Vec::new();
+
+        let mut current_id = 0u32;
+        let mut current_source = 0u32;
+        let mut current_app = String::new();
+        let mut current_bin = String::new();
+        let mut current_vol = 100u8;
+        let mut current_mute = false;
+
+        for line in raw.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.starts_with("Source Output #") {
+                if current_id != 0 {
+                    let display_name = if !current_app.is_empty() {
+                        current_app.clone()
+                    } else if !current_bin.is_empty() {
+                        current_bin.clone()
+                    } else {
+                        format!("Recording #{}", current_id)
+                    };
+
+                    streams.push(AudioRecordStream {
+                        id: current_id,
+                        name: display_name.clone(),
+                        app_name: display_name,
+                        binary_name: current_bin.clone(),
+                        current_source_id: current_source,
+                        volume_percent: current_vol,
+                        is_muted: current_mute,
+                    });
+                }
+
+                current_id = trimmed[15..].trim().parse().unwrap_or(0);
+                current_source = 0;
+                current_app.clear();
+                current_bin.clear();
+                current_vol = 100;
+                current_mute = false;
+            } else if trimmed.starts_with("Source: ") {
+                current_source = trimmed[8..].trim().parse().unwrap_or(0);
+            } else if trimmed.starts_with("Mute: ") {
+                current_mute = trimmed[6..].trim() == "yes";
+            } else if trimmed.starts_with("Volume: ") {
+                if let Some(pct_idx) = trimmed.find('%') {
+                    if let Some(slash_idx) = trimmed[..pct_idx].rfind('/') {
+                        let pct_str = trimmed[slash_idx + 1..pct_idx].trim();
+                        current_vol = pct_str.parse().unwrap_or(100);
+                    }
+                }
+            } else if trimmed.starts_with("application.name = \"") {
+                current_app = trimmed[20..trimmed.len() - 1].to_string();
+            } else if trimmed.starts_with("application.process.binary = \"") {
+                current_bin = trimmed[30..trimmed.len() - 1].to_string();
+            }
+        }
+
+        if current_id != 0 {
+            let display_name = if !current_app.is_empty() {
+                current_app.clone()
+            } else if !current_bin.is_empty() {
+                current_bin.clone()
+            } else {
+                format!("Recording #{}", current_id)
+            };
+
+            streams.push(AudioRecordStream {
+                id: current_id,
+                name: display_name.clone(),
+                app_name: display_name,
+                binary_name: current_bin,
+                current_source_id: current_source,
+                volume_percent: current_vol,
+                is_muted: current_mute,
+            });
+        }
+
+        Ok(streams)
+    }
+
+    /// Sets the volume of an audio input source / microphone (0-150%)
+    pub fn set_source_volume(&self, source_id: u32, volume_percent: u8) -> Result<()> {
+        let pct = volume_percent.clamp(0, 150);
+        let output = Command::new("pactl")
+            .args(["set-source-volume", &source_id.to_string(), &format!("{pct}%")])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to set source volume: {err}")));
+        }
+        Ok(())
+    }
+
+    /// Sets mute status for an audio input source / microphone
+    pub fn set_source_mute(&self, source_id: u32, mute: bool) -> Result<()> {
+        let mute_val = if mute { "1" } else { "0" };
+        let output = Command::new("pactl")
+            .args(["set-source-mute", &source_id.to_string(), mute_val])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to set source mute: {err}")));
+        }
+        Ok(())
+    }
+
+    /// Sets the default recording source / microphone in PipeWire
+    pub fn set_default_source(&self, source_name: &str) -> Result<()> {
+        info!("Setting default input source to: {}", source_name);
+        let output = Command::new("pactl")
+            .args(["set-default-source", source_name])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to set default source: {err}")));
+        }
+        Ok(())
+    }
+
+    /// Reroutes an application recording/capture stream to a specified source / microphone
+    pub fn route_record_stream(&self, stream_id: u32, target_source_id: u32) -> Result<()> {
+        info!("Moving recording stream #{} to source #{}", stream_id, target_source_id);
+        let output = Command::new("pactl")
+            .args(["move-source-output", &stream_id.to_string(), &target_source_id.to_string()])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to route recording stream: {err}")));
+        }
+        Ok(())
+    }
+
+    /// Sets the capture volume of an application recording stream
+    pub fn set_record_stream_volume(&self, stream_id: u32, volume_percent: u8) -> Result<()> {
+        let pct = volume_percent.clamp(0, 150);
+        let output = Command::new("pactl")
+            .args(["set-source-output-volume", &stream_id.to_string(), &format!("{pct}%")])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to set recording stream volume: {err}")));
+        }
+        Ok(())
+    }
+
+    /// Mutes/unmutes an application recording stream
+    pub fn set_record_stream_mute(&self, stream_id: u32, mute: bool) -> Result<()> {
+        let mute_val = if mute { "1" } else { "0" };
+        let output = Command::new("pactl")
+            .args(["set-source-output-mute", &stream_id.to_string(), mute_val])
+            .output()
+            .map_err(|e| NetraError::Io(e))?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(NetraError::DBus(format!("Failed to set recording stream mute: {err}")));
+        }
+        Ok(())
     }
 
     /// Reroutes an application playback stream to a specified sink

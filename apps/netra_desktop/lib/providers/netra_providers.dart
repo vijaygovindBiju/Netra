@@ -434,22 +434,30 @@ final trafficStateProvider = StateNotifierProvider<TrafficNotifier, TrafficState
 class AudioState {
   final List<AudioSinkItem> sinks;
   final List<AudioStreamItem> streams;
+  final List<AudioSourceItem> sources;
+  final List<AudioRecordStreamItem> recordStreams;
   final String? error;
 
   AudioState({
     this.sinks = const [],
     this.streams = const [],
+    this.sources = const [],
+    this.recordStreams = const [],
     this.error,
   });
 
   AudioState copyWith({
     List<AudioSinkItem>? sinks,
     List<AudioStreamItem>? streams,
+    List<AudioSourceItem>? sources,
+    List<AudioRecordStreamItem>? recordStreams,
     String? error,
   }) {
     return AudioState(
       sinks: sinks ?? this.sinks,
       streams: streams ?? this.streams,
+      sources: sources ?? this.sources,
+      recordStreams: recordStreams ?? this.recordStreams,
       error: error,
     );
   }
@@ -468,7 +476,15 @@ class AudioNotifier extends StateNotifier<AudioState> {
     try {
       final sinks = await _service.getAudioSinks();
       final streams = await _service.getAudioStreams();
-      state = state.copyWith(sinks: sinks, streams: streams, error: null);
+      final sources = await _service.getAudioSources();
+      final recordStreams = await _service.getAudioRecordStreams();
+      state = state.copyWith(
+        sinks: sinks,
+        streams: streams,
+        sources: sources,
+        recordStreams: recordStreams,
+        error: null,
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -501,6 +517,37 @@ class AudioNotifier extends StateNotifier<AudioState> {
 
   Future<void> destroyDualAudio(String groupName) async {
     await _service.destroyMultiSink(groupName);
+    await refreshAudio();
+  }
+
+  // Input Audio (Microphone & Recording) methods
+  Future<void> setSourceVolume(int sourceId, int volumePercent) async {
+    await _service.setSourceVolume(sourceId, volumePercent);
+    await refreshAudio();
+  }
+
+  Future<void> setSourceMute(int sourceId, bool isMuted) async {
+    await _service.setSourceMute(sourceId, isMuted);
+    await refreshAudio();
+  }
+
+  Future<void> setDefaultSource(String sourceName) async {
+    await _service.setDefaultSource(sourceName);
+    await refreshAudio();
+  }
+
+  Future<void> routeRecordStream(int streamId, int targetSourceId) async {
+    await _service.routeRecordStream(streamId, targetSourceId);
+    await refreshAudio();
+  }
+
+  Future<void> setRecordStreamVolume(int streamId, int volumePercent) async {
+    await _service.setRecordStreamVolume(streamId, volumePercent);
+    await refreshAudio();
+  }
+
+  Future<void> setRecordStreamMute(int streamId, bool isMuted) async {
+    await _service.setRecordStreamMute(streamId, isMuted);
     await refreshAudio();
   }
 

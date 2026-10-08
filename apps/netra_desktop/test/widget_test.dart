@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:netra_desktop/main.dart';
+import 'package:netra_desktop/models/audio_models.dart';
 import 'package:netra_desktop/models/bluetooth_models.dart';
 
 void main() {
@@ -121,5 +122,46 @@ void main() {
     expect(adapter.maxRecommendedAudioStreams, 3);
     expect(adapter.supportsLeAudio, isTrue);
     expect(adapter.supports2mPhy, isTrue);
+  });
+
+  test('AudioSourceItem and AudioRecordStreamItem parse correctly', () {
+    final sourceJson = {
+      'id': 56,
+      'name': 'alsa_input.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__Mic1__source',
+      'description': 'Raptor Lake-P/U/H cAVS Digital Microphone',
+      'volume_percent': 65,
+      'is_muted': false,
+      'is_default': true,
+      'is_bluetooth': false,
+      'is_monitor': false,
+      'active_port': '[In] Mic1',
+    };
+
+    final source = AudioSourceItem.fromJson(sourceJson);
+    expect(source.id, 56);
+    expect(source.description, 'Raptor Lake-P/U/H cAVS Digital Microphone');
+    expect(source.volumePercent, 65);
+    expect(source.isMuted, isFalse);
+    expect(source.isDefault, isTrue);
+    expect(source.isBluetooth, isFalse);
+    expect(source.isMonitor, isFalse);
+    expect(source.activePort, '[In] Mic1');
+
+    final recordJson = {
+      'id': 107,
+      'name': 'Discord Voice Capture',
+      'app_name': 'Discord',
+      'binary_name': 'discord',
+      'current_source_id': 56,
+      'volume_percent': 100,
+      'is_muted': false,
+    };
+
+    final recordStream = AudioRecordStreamItem.fromJson(recordJson);
+    expect(recordStream.id, 107);
+    expect(recordStream.appName, 'Discord');
+    expect(recordStream.currentSourceId, 56);
+    expect(recordStream.volumePercent, 100);
+    expect(recordStream.isMuted, isFalse);
   });
 }

@@ -285,6 +285,61 @@ impl AudioInterface {
         serde_json::to_string(&streams).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
     }
 
+    async fn get_sources_json(&self) -> zbus::fdo::Result<String> {
+        let engine = self.engine.lock().await;
+        let sources = engine.get_sources().map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+        serde_json::to_string(&sources).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn get_record_streams_json(&self) -> zbus::fdo::Result<String> {
+        let engine = self.engine.lock().await;
+        let streams = engine.get_record_streams().map_err(|e| zbus::fdo::Error::Failed(e.to_string()))?;
+        serde_json::to_string(&streams).map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn set_source_volume(&self, source_id: u32, volume_percent: u8) -> zbus::fdo::Result<bool> {
+        let engine = self.engine.lock().await;
+        engine.set_source_volume(source_id, volume_percent)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn set_source_mute(&self, source_id: u32, is_muted: bool) -> zbus::fdo::Result<bool> {
+        let engine = self.engine.lock().await;
+        engine.set_source_mute(source_id, is_muted)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn set_default_source(&self, source_name: &str) -> zbus::fdo::Result<bool> {
+        let engine = self.engine.lock().await;
+        engine.set_default_source(source_name)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn route_record_stream(&self, stream_id: u32, target_source_id: u32) -> zbus::fdo::Result<bool> {
+        info!("D-Bus: Routing recording stream #{} to source #{}", stream_id, target_source_id);
+        let engine = self.engine.lock().await;
+        engine.route_record_stream(stream_id, target_source_id)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn set_record_stream_volume(&self, stream_id: u32, volume_percent: u8) -> zbus::fdo::Result<bool> {
+        let engine = self.engine.lock().await;
+        engine.set_record_stream_volume(stream_id, volume_percent)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
+    async fn set_record_stream_mute(&self, stream_id: u32, is_muted: bool) -> zbus::fdo::Result<bool> {
+        let engine = self.engine.lock().await;
+        engine.set_record_stream_mute(stream_id, is_muted)
+            .map(|_| true)
+            .map_err(|e| zbus::fdo::Error::Failed(e.to_string()))
+    }
+
     async fn route_stream(&self, stream_id: u32, target_sink_id: u32) -> zbus::fdo::Result<bool> {
         info!("D-Bus: Routing audio stream #{} to sink #{}", stream_id, target_sink_id);
         let engine = self.engine.lock().await;

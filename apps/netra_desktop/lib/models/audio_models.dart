@@ -67,3 +67,74 @@ class AudioStreamItem {
     );
   }
 }
+
+class AudioSourceItem {
+  final int id;
+  final String name;
+  final String description;
+  final int volumePercent;
+  final bool isMuted;
+  final bool isDefault;
+  final bool isBluetooth;
+  final bool isMonitor;
+  final String? activePort;
+
+  AudioSourceItem({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.volumePercent,
+    required this.isMuted,
+    this.isDefault = false,
+    required this.isBluetooth,
+    required this.isMonitor,
+    this.activePort,
+  });
+
+  factory AudioSourceItem.fromJson(Map<String, dynamic> json) {
+    return AudioSourceItem(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: json['name'] ?? '',
+      description: json['description'] ?? '',
+      volumePercent: (json['volume_percent'] as num?)?.toInt() ?? 100,
+      isMuted: json['is_muted'] ?? false,
+      isDefault: json['is_default'] ?? false,
+      isBluetooth: json['is_bluetooth'] ?? false,
+      isMonitor: json['is_monitor'] ?? false,
+      activePort: json['active_port'],
+    );
+  }
+}
+
+class AudioRecordStreamItem {
+  final int id;
+  final String name;
+  final String appName;
+  final String binaryName;
+  final int currentSourceId;
+  final int volumePercent;
+  final bool isMuted;
+
+  AudioRecordStreamItem({
+    required this.id,
+    required this.name,
+    required this.appName,
+    required this.binaryName,
+    required this.currentSourceId,
+    required this.volumePercent,
+    required this.isMuted,
+  });
+
+  factory AudioRecordStreamItem.fromJson(Map<String, dynamic> json) {
+    return AudioRecordStreamItem(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: json['name'] ?? '',
+      appName: json['app_name'] ?? json['name'] ?? '',
+      binaryName: json['binary_name'] ?? '',
+      currentSourceId: (json['current_source_id'] as num?)?.toInt() ?? 0,
+      volumePercent: (json['volume_percent'] as num?)?.toInt() ?? 100,
+      isMuted: json['is_muted'] ?? false,
+    );
+  }
+}
+

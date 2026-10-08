@@ -15,6 +15,16 @@ class AudioView extends ConsumerStatefulWidget {
 class _AudioViewState extends ConsumerState<AudioView> {
   final Set<String> _selectedMultiSinkSlaves = {};
   final TextEditingController _groupNameController = TextEditingController(text: 'Dual Headphones');
+  int _selectedAudioTab = 0; // 0: Output (Playback), 1: Input (Recording/Microphones)
+
+  IconData _getSourceIcon(AudioSourceItem source) {
+    if (source.isBluetooth) return Icons.headset_mic;
+    if (source.isMonitor) return Icons.graphic_eq;
+    if (source.description.toLowerCase().contains('headset') || source.name.toLowerCase().contains('headset')) {
+      return Icons.headphones;
+    }
+    return Icons.mic;
+  }
 
   @override
   void dispose() {
@@ -206,28 +216,59 @@ class _AudioViewState extends ConsumerState<AudioView> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Multi-Bluetooth simultaneous audio, latency compensation, and per-app stream routing',
+                    _selectedAudioTab == 0
+                        ? 'Multi-Bluetooth simultaneous playback, latency compensation, and per-app stream routing'
+                        : 'Microphone management, real-time input levels, and per-app capture routing',
                     style: TextStyle(color: colors.textSecondary, fontSize: 13),
                   ),
                 ],
               ),
-              ElevatedButton.icon(
-                onPressed: () => _showCreateDualAudioDialog(context, audioState.sinks),
-                icon: const Icon(Icons.group_work, size: 16, color: Colors.white),
-                label: const Text(
-                  'Custom Multi-Sync',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+              Row(
+                children: [
+                  SegmentedButton<int>(
+                    segments: [
+                      ButtonSegment(
+                        value: 0,
+                        icon: const Icon(Icons.volume_up, size: 16),
+                        label: Text('Output (${audioState.sinks.length})'),
+                      ),
+                      ButtonSegment(
+                        value: 1,
+                        icon: const Icon(Icons.mic, size: 16),
+                        label: Text('Input (${audioState.sources.where((s) => !s.isMonitor).length})'),
+                      ),
+                    ],
+                    selected: {_selectedAudioTab},
+                    onSelectionChanged: (val) {
+                      setState(() {
+                        _selectedAudioTab = val.first;
+                      });
+                    },
+                  ),
+                  if (_selectedAudioTab == 0) ...[
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _showCreateDualAudioDialog(context, audioState.sinks),
+                      icon: const Icon(Icons.group_work, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Custom Multi-Sync',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colors.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
           const SizedBox(height: 20),
+
+          if (_selectedAudioTab == 0) ...[
 
           // 1-Click Dual Bluetooth Audio Quick Banner
           Container(
@@ -598,6 +639,364 @@ class _AudioViewState extends ConsumerState<AudioView> {
                   },
                 ),
           ),
+          ] else ...[
+            // 1. Default Microphone Quick Status & Master Gain Banner
+            Builder(
+              builder: (context) {
+                final defaultMic = audioState.sources.where((s) => s.isDefault).firstOrNull ??
+                    audioState.sources.where((s) => !s.isMonitor).firstOrNull;
+                final isMicMuted = defaultMic?.isMuted ?? false;
+                final realSources = audioState.sources.where((s) => !s.isMonitor).toList();
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isMicMuted
+                          ? [colors.red.withValues(alpha: 0.12), colors.surfaceCard]
+                          : [colors.green.withValues(alpha: 0.14), colors.primary.withValues(alpha: 0.08)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isMicMuted ? colors.red.withValues(alpha: 0.35) : colors.green.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: (isMicMuted ? colors.red : colors.green).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              isMicMuted ? Icons.mic_off : (defaultMic != null ? _getSourceIcon(defaultMic) : Icons.mic),
+                              color: isMicMuted ? colors.red : colors.green,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      defaultMic != null ? defaultMic.description : 'No Input Microphone',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: colors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (isMicMuted ? colors.red : colors.green).withValues(alpha: 0.18),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        isMicMuted ? 'MUTED' : 'ACTIVE RECORDING SOURCE',
+                                        style: TextStyle(
+                                          color: isMicMuted ? colors.red : colors.green,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  defaultMic != null
+                                      ? '${defaultMic.activePort ?? "Default Input"} • ${realSources.length} microphones available • ${audioState.recordStreams.length} apps capturing'
+                                      : 'Connect a microphone or headset to enable voice capture',
+                                  style: TextStyle(color: colors.textSecondary, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (defaultMic != null) ...[
+                            ElevatedButton.icon(
+                              onPressed: () => notifier.setSourceMute(defaultMic.id, !isMicMuted),
+                              icon: Icon(isMicMuted ? Icons.mic : Icons.mic_off, size: 16, color: Colors.white),
+                              label: Text(
+                                isMicMuted ? 'Unmute Mic' : 'Mute Mic',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isMicMuted ? colors.green : colors.red,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (defaultMic != null) ...[
+                        const SizedBox(height: 12),
+                        Divider(color: colors.border, height: 1),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Text('Master Microphone Gain', style: TextStyle(fontSize: 12, color: colors.textSecondary, fontWeight: FontWeight.w500)),
+                            const Spacer(),
+                            Text('${defaultMic.volumePercent}%', style: TextStyle(fontSize: 12, color: colors.primary, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        Slider(
+                          value: defaultMic.volumePercent.toDouble().clamp(0.0, 150.0),
+                          min: 0,
+                          max: 150,
+                          activeColor: colors.primary,
+                          inactiveColor: colors.surface,
+                          onChanged: (val) => notifier.setSourceVolume(defaultMic.id, val.toInt()),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+
+            // 2. Per-Application Microphone Routing Matrix
+            ResizableCard(
+              title: 'Active Recording Applications (${audioState.recordStreams.length})',
+              icon: Icons.keyboard_voice,
+              initialHeight: 320.0,
+              minHeight: 180.0,
+              maxHeight: 900.0,
+              padding: const EdgeInsets.all(16),
+              child: audioState.recordStreams.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.mic_none, size: 32, color: colors.textMuted),
+                            const SizedBox(height: 8),
+                            Text(
+                              'No applications are currently capturing audio (microphones idle)',
+                              style: TextStyle(color: colors.textMuted, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: audioState.recordStreams.length,
+                      separatorBuilder: (_, _) => Divider(color: colors.border, height: 12),
+                      itemBuilder: (context, idx) {
+                        final stream = audioState.recordStreams[idx];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: colors.primary.withValues(alpha: 0.15),
+                                child: Icon(Icons.mic, color: colors.primary, size: 16),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      stream.appName,
+                                      style: TextStyle(
+                                        color: colors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    Text(
+                                      stream.binaryName.isNotEmpty ? stream.binaryName : 'Capture Stream #${stream.id}',
+                                      style: TextStyle(color: colors.textSecondary, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Target Source Dropdown
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                decoration: BoxDecoration(
+                                  color: colors.surface,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: colors.border),
+                                ),
+                                child: DropdownButton<int>(
+                                  value: audioState.sources.any((s) => s.id == stream.currentSourceId)
+                                      ? stream.currentSourceId
+                                      : (audioState.sources.isNotEmpty ? audioState.sources.first.id : null),
+                                  dropdownColor: colors.surfaceCard,
+                                  underline: const SizedBox(),
+                                  style: TextStyle(color: colors.primary, fontSize: 12, fontWeight: FontWeight.bold),
+                                  items: audioState.sources.map((source) {
+                                    return DropdownMenuItem<int>(
+                                      value: source.id,
+                                      child: Row(
+                                        children: [
+                                          Icon(_getSourceIcon(source), size: 14, color: source.isDefault ? colors.green : colors.textSecondary),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            source.description.length > 28
+                                                ? '${source.description.substring(0, 28)}...'
+                                                : source.description,
+                                            style: TextStyle(color: colors.textPrimary),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (newSourceId) {
+                                    if (newSourceId != null) {
+                                      notifier.routeRecordStream(stream.id, newSourceId);
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('${stream.volumePercent}%', style: TextStyle(fontSize: 12, color: colors.primary, fontWeight: FontWeight.bold)),
+                              IconButton(
+                                icon: Icon(
+                                  stream.isMuted ? Icons.mic_off : Icons.mic,
+                                  color: stream.isMuted ? colors.red : colors.textSecondary,
+                                  size: 18,
+                                ),
+                                onPressed: () => notifier.setRecordStreamMute(stream.id, !stream.isMuted),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            const SizedBox(height: 20),
+
+            // 3. Microphones & Audio Input Sources
+            ResizableCard(
+              title: 'Microphones & Audio Input Sources (${audioState.sources.length})',
+              icon: Icons.mic_external_on,
+              initialHeight: 380.0,
+              minHeight: 180.0,
+              maxHeight: 900.0,
+              padding: const EdgeInsets.all(16),
+              child: ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: audioState.sources.length,
+                separatorBuilder: (_, _) => Divider(color: colors.border, height: 16),
+                itemBuilder: (context, idx) {
+                  final source = audioState.sources[idx];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _getSourceIcon(source),
+                            color: source.isDefault ? colors.green : colors.textSecondary,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  source.description,
+                                  style: TextStyle(
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (source.activePort != null)
+                                  Text(
+                                    source.activePort!,
+                                    style: TextStyle(color: colors.textMuted, fontSize: 11),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (source.isDefault) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.green.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'DEFAULT INPUT',
+                                style: TextStyle(fontSize: 9, color: colors.green, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ] else ...[
+                            OutlinedButton(
+                              onPressed: () => notifier.setDefaultSource(source.name),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: colors.border),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                minimumSize: const Size(50, 26),
+                              ),
+                              child: const Text('Set Default', style: TextStyle(fontSize: 11)),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (source.isMonitor) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colors.secondary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'MONITOR / STEREO MIX',
+                                style: TextStyle(fontSize: 9, color: colors.secondary, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text('${source.volumePercent}%',
+                              style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+                          IconButton(
+                            icon: Icon(
+                              source.isMuted ? Icons.mic_off : Icons.mic,
+                              color: source.isMuted ? colors.red : colors.textSecondary,
+                              size: 18,
+                            ),
+                            onPressed: () => notifier.setSourceMute(source.id, !source.isMuted),
+                          ),
+                        ],
+                      ),
+                      // Volume Slider
+                      Slider(
+                        value: source.volumePercent.toDouble().clamp(0.0, 150.0),
+                        min: 0,
+                        max: 150,
+                        activeColor: colors.primary,
+                        inactiveColor: colors.surface,
+                        onChanged: (val) => notifier.setSourceVolume(source.id, val.toInt()),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );

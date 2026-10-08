@@ -347,4 +347,87 @@ class NetraDbusService {
     );
     return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
   }
+
+  // --- PipeWire Audio Input Methods ---
+  Future<List<AudioSourceItem>> getAudioSources() async {
+    try {
+      final res = await _getObj('/org/netra/Audio').callMethod('org.netra.Audio', 'GetSourcesJson', []);
+      if (res.values.isNotEmpty && res.values[0] is DBusString) {
+        final raw = (res.values[0] as DBusString).value;
+        final List decoded = jsonDecode(raw);
+        return decoded.map((e) => AudioSourceItem.fromJson(e)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<List<AudioRecordStreamItem>> getAudioRecordStreams() async {
+    try {
+      final res = await _getObj('/org/netra/Audio').callMethod('org.netra.Audio', 'GetRecordStreamsJson', []);
+      if (res.values.isNotEmpty && res.values[0] is DBusString) {
+        final raw = (res.values[0] as DBusString).value;
+        final List decoded = jsonDecode(raw);
+        return decoded.map((e) => AudioRecordStreamItem.fromJson(e)).toList();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<bool> setSourceVolume(int sourceId, int volumePercent) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'SetSourceVolume',
+      [DBusUint32(sourceId), DBusByte(volumePercent)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
+
+  Future<bool> setSourceMute(int sourceId, bool isMuted) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'SetSourceMute',
+      [DBusUint32(sourceId), DBusBoolean(isMuted)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
+
+  Future<bool> setDefaultSource(String sourceName) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'SetDefaultSource',
+      [DBusString(sourceName)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
+
+  Future<bool> routeRecordStream(int streamId, int targetSourceId) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'RouteRecordStream',
+      [DBusUint32(streamId), DBusUint32(targetSourceId)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
+
+  Future<bool> setRecordStreamVolume(int streamId, int volumePercent) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'SetRecordStreamVolume',
+      [DBusUint32(streamId), DBusByte(volumePercent)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
+
+  Future<bool> setRecordStreamMute(int streamId, bool isMuted) async {
+    final res = await _getObj('/org/netra/Audio').callMethod(
+      'org.netra.Audio',
+      'SetRecordStreamMute',
+      [DBusUint32(streamId), DBusBoolean(isMuted)],
+    );
+    return res.values.isNotEmpty && res.values[0] is DBusBoolean ? (res.values[0] as DBusBoolean).value : true;
+  }
 }

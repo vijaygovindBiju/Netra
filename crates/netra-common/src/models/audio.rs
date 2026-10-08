@@ -33,3 +33,28 @@ pub struct VirtualMultiSinkGroup {
     pub master_sink_id: Option<u32>,
     pub is_active: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioSource {
+    pub id: u32,
+    pub name: String,
+    pub description: String,
+    pub volume_percent: u8,
+    pub is_muted: bool,
+    pub is_default: bool,
+    pub is_bluetooth: bool,
+    pub is_monitor: bool,
+    pub active_port: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AudioRecordStream {
+    pub id: u32,
+    pub name: String,
+    pub app_name: String,
+    pub binary_name: String,
+    pub current_source_id: u32,
+    pub volume_percent: u8,
+    pub is_muted: bool,
+}
+
