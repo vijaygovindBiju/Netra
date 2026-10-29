@@ -80,8 +80,8 @@ Comprehensive architectural and engineering documentation is available in the [`
 
 ```bash
 # Clone the repository
-git clone https://github.com/netra-linux/netra.git
-cd netra
+git clone https://github.com/vijaygovindBiju/Netra.git
+cd Netra
 
 # One-command full build (Daemon + Desktop GUI)
 ./scripts/build_all.sh
